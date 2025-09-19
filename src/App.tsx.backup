@@ -1,0 +1,29 @@
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import LoginPage from './pages/LoginPage'
+import SalesPage from './pages/SalesPage'
+import StockPage from './pages/StockPage'
+import DashboardPage from './pages/DashboardPage'
+import { isLoggedIn } from './lib/auth'
+
+function ProtectedRoute() {
+	if (!isLoggedIn()) {
+		return <Navigate to="/login" replace />
+	}
+	return <Outlet />
+}
+
+export default function App() {
+	return (
+		<BrowserRouter>
+			<Routes>
+				<Route path="/login" element={<LoginPage />} />
+				<Route element={<ProtectedRoute />}> 
+					<Route path="/SalesPage" element={<SalesPage />} />
+					<Route path="/stock" element={<StockPage />} />
+					<Route path="/dashboard" element={<DashboardPage />} />
+				</Route>
+				<Route path="*" element={<Navigate to="/login" replace />} />
+			</Routes>
+		</BrowserRouter>
+	)
+}
