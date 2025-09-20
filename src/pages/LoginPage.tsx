@@ -5,9 +5,9 @@ import TouchKeyboard from "../components/TouchKeyboard";
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [username, setUsername] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [error, setError] = useState<string>("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -38,9 +38,12 @@ export default function LoginPage() {
     }
   }
 
-  const keyboardValue = activeField === "username" ? username : password;
-  const keyboardOnChange = (next: string) =>
-    activeField === "username" ? setUsername(next) : setPassword(next);
+  const keyboardValue: number =
+    activeField === "username" ? Number(username) : Number(password);
+  const keyboardOnChange: (next: number) => void = (next: number) =>
+    activeField === "username"
+      ? setUsername(next.toString())
+      : setPassword(next.toString());
 
   function handleKeyboardDone() {
     if (activeField === "username") {

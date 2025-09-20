@@ -9,14 +9,15 @@ export default function Sidebar({ className = "" }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const menuItems = [
+  const menuItems: { path: string; label: string; icon: string }[] = [
     { path: "/SalesPage", label: "Satış", icon: "💰" },
     { path: "/dashboard", label: "Raporlar", icon: "📊" },
     { path: "/stock", label: "Stok", icon: "📦" },
     { path: "/settings", label: "Ayarlar", icon: "⚙️" },
   ];
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive: (path: string) => boolean = (path: string): boolean =>
+    location.pathname === path;
 
   return (
     <div
@@ -42,8 +43,6 @@ export default function Sidebar({ className = "" }: SidebarProps) {
           ))}
         </nav>
       </div>
-
-      {/* Alt kısım çıkış butonu */}
       <div className="p-6 border-gray-200">
         <SidebarButton
           label="Çıkış Yap"
