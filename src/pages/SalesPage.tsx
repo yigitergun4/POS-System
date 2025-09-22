@@ -14,6 +14,20 @@ export default function SalesPage() {
   const [lastProduct, setLastProduct] = useState<CartItem | null>(null);
   const [tab, setTab] = useState<"barcode" | "manual">("barcode");
 
+  const handleClearCart: () => void = () => {
+    setCart([]);
+    setLastProduct(null);
+    setQty(1);
+  };
+
+  const handleCashPayment: () => void = () => {
+    alert("Nakit ödeme");
+  };
+
+  const handleCardPayment: () => void = () => {
+    alert("Kart ile ödeme");
+  };
+
   useBarcodeScanner((code) => {
     if (tab !== "barcode") return;
     const product: CartItem | undefined = products.find(
@@ -192,8 +206,9 @@ export default function SalesPage() {
         </div>
         <SalesPageTotalSide
           total={total}
-          onCashPayment={() => alert("Nakit ödeme")}
-          onCardPayment={() => alert("Kart ile ödeme")}
+          onCashPayment={handleCashPayment}
+          onCardPayment={handleCardPayment}
+          onClearCart={handleClearCart}
         />
       </div>
     </div>

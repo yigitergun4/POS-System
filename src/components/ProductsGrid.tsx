@@ -17,7 +17,6 @@ export default function ProductGrid({ products, onSelect }: ProductGridProps) {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Kategoriler (sabit kalır) */}
       <div className="flex gap-2 mb-4 pb-2 overflow-x-auto">
         {categories.map((cat) => (
           <button
@@ -33,9 +32,7 @@ export default function ProductGrid({ products, onSelect }: ProductGridProps) {
           </button>
         ))}
       </div>
-
-      {/* Ürünler (sadece burası scroll olur) */}
-      <div className="flex-1 overflow-y-auto pr-1">
+      <div className="flex-1 max-h-[500px] overflow-y-auto pr-1">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {products
             .filter((p) => p.category === activeCategory)

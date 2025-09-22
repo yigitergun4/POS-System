@@ -15,10 +15,10 @@ export default function SalesPageTotalSide({
   onClearCart,
 }: SalesPageTotalSideProps) {
   return (
-    <div className="w-1/4 bg-gray-50 border-l border-gray-200 flex justify-end flex-col p-6">
+    <div className="w-1/4 bg-gray-50 border-l border-gray-200 flex flex-col p-6">
       <h2 className="text-xl font-bold text-gray-800 mb-4">Ödeme Özeti</h2>
       <TotalCard total={total} />
-      <div className="space-y-3">
+      <div className="space-y-3 mt-4">
         <PaymentButton
           label="💵 Nakit Ödeme"
           color="green"
@@ -30,16 +30,15 @@ export default function SalesPageTotalSide({
           onClick={onCardPayment}
         />
       </div>
-      <div className="mt-6">
-        <button
+      <div className="mt-auto space-y-3">
+        <PaymentButton
+          label="Sepeti Temizle"
+          color="red"
           onClick={onClearCart}
-          className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl shadow-md active:scale-95 transition-transform"
-        >
-          Sepeti Temizle
-        </button>
-      </div>
-      <div className="mt-auto flex justify-end items-center text-center text-sm text-gray-500">
-        Satışı tamamlamak için ödeme yöntemini seçiniz
+        />
+        <p className="text-center text-sm text-gray-500">
+          Satışı tamamlamak için ödeme yöntemini seçiniz
+        </p>
       </div>
     </div>
   );
