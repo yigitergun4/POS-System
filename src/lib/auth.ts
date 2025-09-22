@@ -10,7 +10,7 @@ export function isLoggedIn(): boolean {
 
 export function login(username: string, password: string): boolean {
   // Simple demo: any non-empty credentials succeed
-  const DEMO_USER = {
+  const DEMO_USER: { username: string; password: string } = {
     username: "admin",
     password: "123456",
   };
