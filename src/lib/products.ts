@@ -718,7 +718,7 @@ export const products: CartItem[] = [
     id: 89,
     name: "Efes Özel Seri Şişe",
     price: 100,
-    qty: 6,
+    qty: 3,
     barcode: "8690520532901",
     category: categories[2],
   },

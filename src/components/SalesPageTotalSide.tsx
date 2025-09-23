@@ -23,11 +23,13 @@ export default function SalesPageTotalSide({
           label="💵 Nakit Ödeme"
           color="green"
           onClick={onCashPayment}
+          disabled={total === 0}
         />
         <PaymentButton
           label="💳 Kart ile Ödeme"
           color="blue"
           onClick={onCardPayment}
+          disabled={total === 0}
         />
       </div>
       <div className="mt-auto space-y-3">
