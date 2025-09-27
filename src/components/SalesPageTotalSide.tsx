@@ -3,9 +3,9 @@ import TotalCard from "./SalesPageTotalCard";
 
 interface SalesPageTotalSideProps {
   total: number;
-  onCashPayment?: () => void;
-  onCardPayment?: () => void;
-  onClearCart?: () => void; // ✅ sepeti silme fonksiyonu
+  onCashPayment?: () => Promise<void>;
+  onCardPayment?: () => Promise<void>;
+  onClearCart?: () => void;
 }
 
 export default function SalesPageTotalSide({

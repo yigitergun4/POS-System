@@ -20,11 +20,11 @@ export default function SalesPage() {
     setQty(1);
   };
 
-  const handleCashPayment: () => void = () => {
-    alert("Nakit ödeme");
+  const handleCashPayment: () => Promise<void> = async () => {
+    alert("Nakit Ödeme");
   };
 
-  const handleCardPayment: () => void = () => {
+  const handleCardPayment: () => Promise<void> = async () => {
     alert("Kart ile ödeme");
   };
 
