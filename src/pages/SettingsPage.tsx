@@ -1,5 +1,5 @@
 import Navbar from "../components/Navbar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   collection,
   doc,
@@ -8,6 +8,8 @@ import {
   updateDoc,
   getDocs,
   getDoc,
+  type DocumentReference,
+  type DocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import type { CartItem } from "../types/Product";
@@ -30,6 +32,8 @@ export default function SettingsPage() {
     barcode: "",
     category: "Diğer",
   });
+  const [currency, setCurrency] = useState<string>("TL");
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   // 🔹 Firestore stockLevels ile aynı key'ler
   const [stockLevels, setStockLevels] = useState<{
@@ -50,11 +54,9 @@ export default function SettingsPage() {
 
   // 🔹 Ürünleri çek
   useEffect(() => {
-    const fetchProducts = async (): Promise<void> => {
+    const fetchProducts = async () => {
       const snapshot = await getDocs(collection(db, "products"));
-      const data = snapshot.docs.map((doc) => ({
-        ...(doc.data() as CartItem),
-      }));
+      const data = snapshot.docs.map((doc) => doc.data() as CartItem);
       setProductList(data);
     };
     fetchProducts();
@@ -72,14 +74,46 @@ export default function SettingsPage() {
     fetchStockLevels();
   }, []);
 
+  // 🔹 Firestore'dan para birimini çek
+  useEffect(() => {
+    const fetchCurrency = async () => {
+      const generalRef = doc(db, "settings", "general");
+      const snapshot = await getDoc(generalRef);
+      if (snapshot.exists()) {
+        setCurrency((snapshot.data() as { currency: string }).currency);
+      }
+    };
+    fetchCurrency();
+  }, []);
+
+  // 🔹 Ürün ekleme
   const handleAddProduct = async (): Promise<void> => {
-    if (!newProduct.name || !newProduct.barcode) {
-      alert("Ürün adı ve barkod gerekli!");
+    if (!newProduct.name.trim() || !newProduct.barcode.trim()) {
+      toast.error("Ürün adı ve barkod zorunludur!");
       return;
     }
+    if (newProduct.price <= 0) {
+      toast.error("Fiyat 0'dan büyük olmalı!");
+      return;
+    }
+    if (newProduct.qty < 0) {
+      toast.error("Stok negatif olamaz!");
+      return;
+    }
+
     const id: string = newProduct.barcode;
-    await setDoc(doc(db, "products", id), { ...newProduct, id });
+    const productRef: DocumentReference = doc(db, "products", id);
+    const existing: DocumentSnapshot = await getDoc(productRef);
+
+    if (existing.exists()) {
+      toast.error("Bu barkod ile zaten bir ürün mevcut!");
+      return;
+    }
+
+    await setDoc(productRef, { ...newProduct, id });
     setProductList((prev) => [...prev, { ...newProduct, id: Number(id) }]);
+    toast.success(`${newProduct.name} başarıyla eklendi ✅`);
+
     setShowAddModal(false);
     setNewProduct({
       id: 0,
@@ -107,11 +141,14 @@ export default function SettingsPage() {
     await updateDoc(doc(db, "products", id), { [field]: value });
   };
 
-  const updateStock = (key: keyof typeof stockLevels, value: number) => {
+  const updateStock: (key: keyof typeof stockLevels, value: number) => void = (
+    key,
+    value
+  ) => {
     setStockLevels((prev) => ({ ...prev, [key]: value }));
   };
 
-  const resetStockLevels = () => {
+  const resetStockLevels: () => void = () => {
     setStockLevels({
       bira: 24,
       cikolata: 15,
@@ -122,10 +159,25 @@ export default function SettingsPage() {
     });
   };
 
-  const saveStockLevels = async () => {
+  const saveStockLevels: () => Promise<void> = async () => {
     const stockRef = doc(db, "settings", "stockLevels");
     await setDoc(stockRef, stockLevels);
     toast.success("Stok seviyeleri kaydedildi ✅");
+  };
+
+  const saveCurrency: () => Promise<void> = async () => {
+    const generalRef = doc(db, "settings", "general");
+    await setDoc(generalRef, { currency });
+    toast.success("Para birimi kaydedildi ✅");
+  };
+
+  const STOCK_LABELS: Record<string, string> = {
+    bira: "🍺 Bira",
+    cikolata: "🍫 Çikolata",
+    icecek: "🥤 İçecek",
+    agiralkol: "🥃 Ağır Alkol",
+    kuruyemisler: "🥜 Kuruyemişler",
+    diger: "📦 Diğer",
   };
 
   return (
@@ -138,7 +190,7 @@ export default function SettingsPage() {
             activeTab === "general" ? "bg-blue-500 text-white" : "bg-gray-100"
           }`}
         >
-          🌍 Genel Ayarlar
+          ⚙️ Genel Ayarlar
         </button>
         <button
           onClick={() => setActiveTab("stock")}
@@ -157,12 +209,38 @@ export default function SettingsPage() {
           🛒 Ürün Yönetimi
         </button>
       </div>
+      {activeTab === "general" && (
+        <div className="p-6 bg-white shadow-md rounded-xl border border-gray-200 m-6">
+          <h2 className="text-lg font-semibold mb-4">
+            ⚙️ Genel Uygulama Ayarları
+          </h2>
+          <label className="flex justify-between items-center text-sm">
+            <span>Para Birimi</span>
+            <select
+              className="border rounded-lg px-2 py-1 text-sm"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+            >
+              <option value="TL">₺ TL</option>
+              <option value="USD">$ USD</option>
+              <option value="EUR">€ EUR</option>
+            </select>
+          </label>
+          <div className="flex justify-end mt-6">
+            <button
+              onClick={saveCurrency}
+              className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm"
+            >
+              Kaydet
+            </button>
+          </div>
+        </div>
+      )}
       {activeTab === "stock" && (
         <div className="p-6 bg-white shadow-md rounded-xl border border-gray-200 m-6">
           <h2 className="text-lg font-semibold mb-4">📦 Stok Ayarları</h2>
           <p className="text-sm text-gray-600 mb-6">
             Buradan kategori bazlı kritik stok seviyelerini belirleyebilirsiniz.
-            Stok bu seviyenin altına düştüğünde sistem sizi uyaracaktır.
           </p>
           <div className="space-y-4">
             {Object.entries(stockLevels).map(([key, value]) => (
@@ -170,7 +248,7 @@ export default function SettingsPage() {
                 key={key}
                 className="flex justify-between items-center text-sm"
               >
-                <span className="capitalize">{key}</span>
+                <span>{STOCK_LABELS[key] || key}</span>
                 <input
                   type="number"
                   min={0}
@@ -215,13 +293,27 @@ export default function SettingsPage() {
             >
               ➕ Ürün Ekle
             </button>
-            <input
-              type="text"
-              placeholder="Barkod veya ürün adı ara..."
-              className="border px-3 py-2 rounded-lg text-sm w-72"
-              value={filterText}
-              onChange={(e) => setFilterText(e.target.value)}
-            />
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                className="bg-red-600 hover:bg-red-700 text-white px-2 py-2 rounded-lg text-sm font-medium shadow"
+                onClick={() => {
+                  setFilterText("");
+                  inputRef.current?.focus();
+                }}
+              >
+                X
+              </button>
+              <input
+                ref={inputRef}
+                type="text"
+                placeholder="Barkod veya ürün adı ara..."
+                className="border px-3 py-2 rounded-lg text-sm w-72"
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                onFocus={(e) => e.target.select()}
+              />
+            </div>
           </div>
           <ProductTableSettingsPage
             products={productList}

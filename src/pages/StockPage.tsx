@@ -1,10 +1,15 @@
 import Navbar from "../components/Navbar";
-import { products } from "../lib/products";
 import { useState, useMemo, useEffect } from "react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  onSnapshot,
+} from "firebase/firestore";
 import { db } from "../lib/firebase";
+import type { CartItem } from "../types/Product";
 
-// 🔑 Firestore key mapping
 const categoryKeyMap: Record<string, string> = {
   Bira: "bira",
   Çikolata: "cikolata",
@@ -15,17 +20,25 @@ const categoryKeyMap: Record<string, string> = {
 };
 
 export default function StockPage() {
-  const [stock] = useState(products);
+  const [stock, setStock] = useState<CartItem[]>([]);
   const [stockThresholds, setStockThresholds] = useState<
     Record<string, number>
   >({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const categories: string[] = Array.from(
-    new Set(stock.map((p) => p.category))
-  );
+  // 🔹 Firestore'dan ürünleri gerçek zamanlı çek
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
+      const data = snapshot.docs.map((doc) => ({
+        ...(doc.data() as CartItem),
+      }));
+      setStock(data);
+    });
 
-  // 🔹 Firestore'dan kritik stok değerlerini çek
+    return () => unsubscribe(); // cleanup
+  }, []);
+
+  // 🔹 Firestore'dan kritik stok seviyelerini çek
   useEffect(() => {
     const fetchStockLevels = async () => {
       try {
@@ -38,7 +51,6 @@ export default function StockPage() {
           const data = snapshot.data() as Record<string, number>;
           setStockThresholds(data);
         } else {
-          // Varsayılan değerleri yaz
           const defaultThresholds: Record<string, number> = {
             bira: 24,
             cikolata: 15,
@@ -53,7 +65,6 @@ export default function StockPage() {
       } catch (err) {
         console.error("❌ Stok eşikleri yüklenemedi:", err);
         setStockThresholds({
-          biskuvi: 20,
           bira: 24,
           cikolata: 15,
           icecek: 20,
@@ -71,11 +82,13 @@ export default function StockPage() {
 
   // 🔹 Ürünleri kategoriye göre gruplandır + kritik stoklara göre sırala
   const groupedStock: Record<string, typeof stock> = useMemo(() => {
-    if (loading || Object.keys(stockThresholds).length === 0) {
+    if (loading || stock.length === 0) {
       return {};
     }
 
+    const categories = Array.from(new Set(stock.map((p) => p.category)));
     const groups: Record<string, typeof stock> = {};
+
     categories.forEach((cat) => {
       const key = categoryKeyMap[cat] || cat.toLowerCase();
       const threshold: number = stockThresholds[key] ?? 0;
@@ -90,7 +103,7 @@ export default function StockPage() {
         });
     });
     return groups;
-  }, [stock, stockThresholds, categories, loading]);
+  }, [stock, stockThresholds, loading]);
 
   if (loading) {
     return (
@@ -106,6 +119,8 @@ export default function StockPage() {
     );
   }
 
+  const categories = Object.keys(groupedStock);
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       <Navbar pageTitle="Stok" />
@@ -115,10 +130,10 @@ export default function StockPage() {
         </h1>
         <div className="flex-1 overflow-auto space-y-8 pr-2">
           {categories.map((cat) => {
-            const key = categoryKeyMap[cat] || cat.toLowerCase();
-            const threshold = stockThresholds[key] ?? 0;
+            const key: string = categoryKeyMap[cat] || cat.toLowerCase();
+            const threshold: number = stockThresholds[key] ?? 0;
 
-            const criticalCount =
+            const criticalCount: number =
               groupedStock[cat]?.filter((item) => item.qty <= threshold)
                 .length || 0;
 
@@ -162,7 +177,7 @@ export default function StockPage() {
                         const isLow = item.qty <= threshold;
                         return (
                           <tr
-                            key={item.id}
+                            key={item.barcode}
                             className={`border-b last:border-none ${
                               isLow ? "bg-red-100" : "hover:bg-gray-50"
                             }`}

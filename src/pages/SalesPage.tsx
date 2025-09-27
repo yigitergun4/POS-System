@@ -1,38 +1,51 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import SalesPageTotalSide from "../components/SalesPageTotalSide";
 import useBarcodeScanner from "../hooks/useBarcodeScanner";
 import QuantityInput from "../components/QuantityInput";
 import CartItemControls from "../components/CardItemsControls";
 import ProductGrid from "../components/ProductsGrid";
-import { products } from "../lib/products";
+import { db } from "../lib/firebase";
+import { collection, onSnapshot } from "firebase/firestore";
 import { type CartItem } from "../types/Product";
 
 export default function SalesPage() {
+  const [allProducts, setAllProducts] = useState<CartItem[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [qty, setQty] = useState<number>(1);
   const [lastProduct, setLastProduct] = useState<CartItem | null>(null);
   const [tab, setTab] = useState<"barcode" | "manual">("barcode");
 
-  const handleClearCart: () => void = () => {
+  // 🔹 Firestore'dan ürünleri gerçek zamanlı dinle
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
+      const data = snapshot.docs.map((doc) => ({
+        ...(doc.data() as CartItem),
+      }));
+      setAllProducts(data);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleClearCart = () => {
     setCart([]);
     setLastProduct(null);
     setQty(1);
   };
 
-  const handleCashPayment: () => Promise<void> = async () => {
+  const handleCashPayment = async () => {
     alert("Nakit Ödeme");
   };
 
-  const handleCardPayment: () => Promise<void> = async () => {
+  const handleCardPayment = async () => {
     alert("Kart ile ödeme");
   };
 
+  // 🔹 Barkod okutma
   useBarcodeScanner((code) => {
     if (tab !== "barcode") return;
-    const product: CartItem | undefined = products.find(
-      (p: CartItem) => p.barcode === code
-    );
+    const product = allProducts.find((p) => p.barcode === code);
     if (!product) {
       console.log("Ürün bulunamadı: " + code);
       return;
@@ -42,10 +55,12 @@ export default function SalesPage() {
     setLastProduct(addedProduct);
 
     setCart((prev) => {
-      const exists = prev.find((item) => item.id === product.id);
+      const exists = prev.find((item) => item.barcode === product.barcode);
       if (exists) {
         return prev.map((item) =>
-          item.id === product.id ? { ...item, qty: item.qty + qty } : item
+          item.barcode === product.barcode
+            ? { ...item, qty: item.qty + qty }
+            : item
         );
       }
       return [...prev, addedProduct];
@@ -57,10 +72,12 @@ export default function SalesPage() {
   const handleSelectProduct = (product: CartItem) => {
     setLastProduct(product);
     setCart((prev) => {
-      const exists = prev.find((item) => item.id === product.id);
+      const exists = prev.find((item) => item.barcode === product.barcode);
       if (exists) {
         return prev.map((item) =>
-          item.id === product.id ? { ...item, qty: item.qty + 1 } : item
+          item.barcode === product.barcode
+            ? { ...item, qty: item.qty + 1 }
+            : item
         );
       }
       return [...prev, { ...product, qty: 1 }];
@@ -145,7 +162,7 @@ export default function SalesPage() {
                   <tbody>
                     {cart.map((item) => (
                       <tr
-                        key={item.id}
+                        key={item.barcode}
                         className="border-b last:border-none hover:bg-gray-50"
                       >
                         <td className="px-4 py-3">{item.name}</td>
@@ -155,7 +172,7 @@ export default function SalesPage() {
                             onIncrease={() =>
                               setCart((prev) =>
                                 prev.map((p) =>
-                                  p.id === item.id
+                                  p.barcode === item.barcode
                                     ? { ...p, qty: p.qty + 1 }
                                     : p
                                 )
@@ -164,7 +181,7 @@ export default function SalesPage() {
                             onDecrease={() =>
                               setCart((prev) =>
                                 prev.map((p) =>
-                                  p.id === item.id
+                                  p.barcode === item.barcode
                                     ? { ...p, qty: Math.max(p.qty - 1, 1) }
                                     : p
                                 )
@@ -172,7 +189,7 @@ export default function SalesPage() {
                             }
                             onRemove={() =>
                               setCart((prev) =>
-                                prev.filter((p) => p.id !== item.id)
+                                prev.filter((p) => p.barcode !== item.barcode)
                               )
                             }
                           />
@@ -200,7 +217,10 @@ export default function SalesPage() {
           )}
           {tab === "manual" && (
             <div className="flex-1 overflow-auto">
-              <ProductGrid products={products} onSelect={handleSelectProduct} />
+              <ProductGrid
+                products={allProducts}
+                onSelect={handleSelectProduct}
+              />
             </div>
           )}
         </div>
