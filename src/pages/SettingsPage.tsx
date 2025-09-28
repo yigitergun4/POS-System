@@ -6,10 +6,9 @@ import {
   setDoc,
   deleteDoc,
   updateDoc,
-  getDocs,
   getDoc,
+  onSnapshot,
   type DocumentReference,
-  type DocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import type { CartItem } from "../types/Product";
@@ -34,8 +33,6 @@ export default function SettingsPage() {
   });
   const [currency, setCurrency] = useState<string>("TL");
   const inputRef = useRef<HTMLInputElement | null>(null);
-
-  // 🔹 Firestore stockLevels ile aynı key'ler
   const [stockLevels, setStockLevels] = useState<{
     bira: number;
     cikolata: number;
@@ -52,17 +49,16 @@ export default function SettingsPage() {
     diger: 5,
   });
 
-  // 🔹 Ürünleri çek
+  // 🔹 Ürünler için canlı dinleme
   useEffect(() => {
-    const fetchProducts = async () => {
-      const snapshot = await getDocs(collection(db, "products"));
+    const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
       const data = snapshot.docs.map((doc) => doc.data() as CartItem);
       setProductList(data);
-    };
-    fetchProducts();
+    });
+    return () => unsubscribe();
   }, []);
 
-  // 🔹 Firestore'dan stok seviyelerini çek
+  // 🔹 Stok seviyeleri
   useEffect(() => {
     const fetchStockLevels = async () => {
       const stockRef = doc(db, "settings", "stockLevels");
@@ -74,7 +70,7 @@ export default function SettingsPage() {
     fetchStockLevels();
   }, []);
 
-  // 🔹 Firestore'dan para birimini çek
+  // 🔹 Para birimi
   useEffect(() => {
     const fetchCurrency = async () => {
       const generalRef = doc(db, "settings", "general");
@@ -86,8 +82,8 @@ export default function SettingsPage() {
     fetchCurrency();
   }, []);
 
-  // 🔹 Ürün ekleme
-  const handleAddProduct = async (): Promise<void> => {
+  // 🔹 Yeni ürün ekleme
+  const handleAddProduct = async () => {
     if (!newProduct.name.trim() || !newProduct.barcode.trim()) {
       toast.error("Ürün adı ve barkod zorunludur!");
       return;
@@ -103,7 +99,7 @@ export default function SettingsPage() {
 
     const id: string = newProduct.barcode;
     const productRef: DocumentReference = doc(db, "products", id);
-    const existing: DocumentSnapshot = await getDoc(productRef);
+    const existing = await getDoc(productRef);
 
     if (existing.exists()) {
       toast.error("Bu barkod ile zaten bir ürün mevcut!");
@@ -111,9 +107,12 @@ export default function SettingsPage() {
     }
 
     await setDoc(productRef, { ...newProduct, id });
-    setProductList((prev) => [...prev, { ...newProduct, id: Number(id) }]);
     toast.success(`${newProduct.name} başarıyla eklendi ✅`);
+    handleCloseModal();
+  };
 
+  // 🔹 Modal kapatma
+  const handleCloseModal = () => {
     setShowAddModal(false);
     setNewProduct({
       id: 0,
@@ -125,30 +124,28 @@ export default function SettingsPage() {
     });
   };
 
-  const handleDeleteProduct: (id: string) => Promise<void> = async (id) => {
+  // 🔹 Ürün silme
+  const handleDeleteProduct = async (id: string) => {
     await deleteDoc(doc(db, "products", id));
-    setProductList((prev) => prev.filter((p) => p.barcode !== id));
+    toast.success("Ürün silindi ✅");
   };
 
+  // 🔹 Ürün güncelleme
   const handleUpdateProduct = async (
     id: string,
     field: keyof CartItem,
     value: string | number
   ) => {
-    setProductList((prev) =>
-      prev.map((p) => (p.barcode === id ? { ...p, [field]: value } : p))
-    );
     await updateDoc(doc(db, "products", id), { [field]: value });
+    toast.success("Ürün güncellendi ✅");
   };
 
-  const updateStock: (key: keyof typeof stockLevels, value: number) => void = (
-    key,
-    value
-  ) => {
+  // 🔹 Stok işlemleri
+  const updateStock = (key: keyof typeof stockLevels, value: number) => {
     setStockLevels((prev) => ({ ...prev, [key]: value }));
   };
 
-  const resetStockLevels: () => void = () => {
+  const resetStockLevels = () => {
     setStockLevels({
       bira: 24,
       cikolata: 15,
@@ -159,13 +156,14 @@ export default function SettingsPage() {
     });
   };
 
-  const saveStockLevels: () => Promise<void> = async () => {
+  const saveStockLevels = async () => {
     const stockRef = doc(db, "settings", "stockLevels");
     await setDoc(stockRef, stockLevels);
     toast.success("Stok seviyeleri kaydedildi ✅");
   };
 
-  const saveCurrency: () => Promise<void> = async () => {
+  // 🔹 Para birimi kaydetme
+  const saveCurrency = async () => {
     const generalRef = doc(db, "settings", "general");
     await setDoc(generalRef, { currency });
     toast.success("Para birimi kaydedildi ✅");
@@ -328,7 +326,7 @@ export default function SettingsPage() {
           newProduct={newProduct}
           setNewProduct={setNewProduct}
           onSave={handleAddProduct}
-          onClose={() => setShowAddModal(false)}
+          onClose={handleCloseModal}
         />
       )}
     </div>

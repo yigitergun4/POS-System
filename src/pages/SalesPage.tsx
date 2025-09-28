@@ -6,8 +6,17 @@ import QuantityInput from "../components/QuantityInput";
 import CartItemControls from "../components/CardItemsControls";
 import ProductGrid from "../components/ProductsGrid";
 import { db } from "../lib/firebase";
-import { collection, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  addDoc,
+  serverTimestamp,
+  doc,
+  updateDoc,
+  increment,
+} from "firebase/firestore";
 import { type CartItem } from "../types/Product";
+import { format } from "date-fns"; // günlük ID için
 
 export default function SalesPage() {
   const [allProducts, setAllProducts] = useState<CartItem[]>([]);
@@ -16,7 +25,6 @@ export default function SalesPage() {
   const [lastProduct, setLastProduct] = useState<CartItem | null>(null);
   const [tab, setTab] = useState<"barcode" | "manual">("barcode");
 
-  // 🔹 Firestore'dan ürünleri gerçek zamanlı dinle
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
       const data = snapshot.docs.map((doc) => ({
@@ -28,21 +36,47 @@ export default function SalesPage() {
     return () => unsubscribe();
   }, []);
 
-  const handleClearCart = () => {
+  const handleClearCart: () => void = () => {
     setCart([]);
     setLastProduct(null);
     setQty(1);
   };
+  const completeSale: (
+    paymentMethod: "cash" | "card" | "family"
+  ) => Promise<void> = async (paymentMethod: "cash" | "card" | "family") => {
+    if (cart.length === 0) {
+      alert("Sepet boş!");
+      return;
+    }
 
-  const handleCashPayment = async () => {
-    alert("Nakit Ödeme");
+    try {
+      const todayId: string = format(new Date(), "yyyy-MM-dd");
+      await addDoc(collection(db, "sales"), {
+        timestamp: serverTimestamp(),
+        saleDay: todayId,
+        items: cart,
+        total,
+        paymentMethod,
+      });
+      for (const product of cart) {
+        const productRef = doc(db, "products", product.barcode);
+        await updateDoc(productRef, {
+          qty: increment(-product.qty),
+        });
+      }
+
+      handleClearCart();
+      alert("Satış başarıyla gerçekleştirildi ✅");
+    } catch (err) {
+      console.error("Satış kaydedilemedi:", err);
+      alert("Satış gerçekleştirilirken hata oluştu ❌");
+    }
   };
 
-  const handleCardPayment = async () => {
-    alert("Kart ile ödeme");
-  };
+  const handleCashPayment = async () => completeSale("cash");
+  const handleCardPayment = async () => completeSale("card");
+  const handleFamilyPayment = async () => completeSale("family");
 
-  // 🔹 Barkod okutma
   useBarcodeScanner((code) => {
     if (tab !== "barcode") return;
     const product = allProducts.find((p) => p.barcode === code);
@@ -70,7 +104,7 @@ export default function SalesPage() {
   });
 
   const handleSelectProduct = (product: CartItem) => {
-    setLastProduct(product);
+    setLastProduct({ ...product, qty: 1 });
     setCart((prev) => {
       const exists = prev.find((item) => item.barcode === product.barcode);
       if (exists) {
@@ -141,7 +175,7 @@ export default function SalesPage() {
                 </div>
                 <QuantityInput qty={qty} setQty={setQty} />
               </div>
-              <div className="flex-1 bg-white rounded-2xl shadow-md border border-gray-200 overflow-y-auto max-h-[500px]">
+              <div className="flex-1 bg-white rounded-2xl shadow-md border border-gray-200 overflow-y-auto max-h-[480px]">
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-gray-100 border-b border-gray-300 sticky top-0 z-10">
                     <tr>
@@ -229,6 +263,7 @@ export default function SalesPage() {
           onCashPayment={handleCashPayment}
           onCardPayment={handleCardPayment}
           onClearCart={handleClearCart}
+          onFamilyPayment={handleFamilyPayment}
         />
       </div>
     </div>

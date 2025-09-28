@@ -1,3 +1,4 @@
+import { useRef, useEffect } from "react";
 import type { CartItem } from "../types/Product";
 
 type Props = {
@@ -13,6 +14,12 @@ export default function AddProductModalSettingsPage({
   onSave,
   onClose,
 }: Props) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl p-6 w-96 shadow-lg space-y-4">
@@ -20,6 +27,7 @@ export default function AddProductModalSettingsPage({
         <div>
           <label className="block text-sm text-gray-600 mb-1">Ürün Adı</label>
           <input
+            ref={inputRef}
             placeholder="Örn: Eti Cin"
             className="border rounded-lg px-2 py-2 w-full"
             value={newProduct.name}
@@ -50,11 +58,13 @@ export default function AddProductModalSettingsPage({
               className="border rounded-lg px-2 py-2 w-full text-right"
               value={newProduct.price}
               onInput={(e) => {
-                const value = (e.target as HTMLInputElement).value.replace(
-                  /\D/g,
-                  ""
-                );
-                setNewProduct({ ...newProduct, price: Number(value) || 0 });
+                const rawValue: string = (e.target as HTMLInputElement).value;
+                const cleaned: string = rawValue.replace(/[^0-9.,]/g, "");
+                const normalized: string = cleaned.replace(",", ".");
+                setNewProduct({
+                  ...newProduct,
+                  price: parseFloat(normalized) || 0,
+                });
               }}
             />
           </div>
