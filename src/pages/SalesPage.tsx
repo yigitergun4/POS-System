@@ -73,11 +73,14 @@ export default function SalesPage() {
     }
   };
 
-  const handleCashPayment = async () => completeSale("cash");
-  const handleCardPayment = async () => completeSale("card");
-  const handleFamilyPayment = async () => completeSale("family");
+  const handleCashPayment: () => Promise<void> = async () =>
+    completeSale("cash");
+  const handleCardPayment: () => Promise<void> = async () =>
+    completeSale("card");
+  const handleFamilyPayment: () => Promise<void> = async () =>
+    completeSale("family");
 
-  useBarcodeScanner((code) => {
+  useBarcodeScanner((code: string) => {
     if (tab !== "barcode") return;
     const product = allProducts.find((p) => p.barcode === code);
     if (!product) {
@@ -103,7 +106,9 @@ export default function SalesPage() {
     setQty(1);
   });
 
-  const handleSelectProduct = (product: CartItem) => {
+  const handleSelectProduct: (product: CartItem) => void = (
+    product: CartItem
+  ) => {
     setLastProduct({ ...product, qty: 1 });
     setCart((prev) => {
       const exists = prev.find((item) => item.barcode === product.barcode);

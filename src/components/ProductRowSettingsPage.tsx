@@ -8,19 +8,15 @@ type Props = {
   onDelete: (id: string) => void;
 };
 
-const Button = ({
-  children,
-  onClick,
-  className,
-}: {
+const Button: React.FC<{
   children: React.ReactNode;
   onClick: () => void;
   className: string;
-}) => {
+}> = ({ children, onClick, className }) => {
   return (
     <button
       onClick={onClick}
-      className={`bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-xs shadow ${className} mr-2`}
+      className={`px-3 py-1 rounded-lg text-xs shadow text-white mr-2 ${className}`}
     >
       {children}
     </button>
@@ -34,14 +30,27 @@ export default function ProductRowSettingsPage({
 }: Props) {
   const [isEditing, setIsEditing] = useState(false);
 
+  // geçici alanlar
+  const [editName, setEditName] = useState(product.name);
+  const [editPrice, setEditPrice] = useState(product.price);
+  const [editQty, setEditQty] = useState(product.qty);
+
+  const handleSave = () => {
+    onUpdate(product.barcode, "name", editName);
+    onUpdate(product.barcode, "price", editPrice);
+    onUpdate(product.barcode, "qty", editQty);
+    setIsEditing(false);
+    toast.success(`${product.name} ürünü güncellendi ✅`);
+  };
+
   return (
     <tr className="hover:bg-gray-50">
       <td className="border px-3 py-2">
         {isEditing ? (
           <input
             className="w-full border rounded px-2 py-1"
-            value={product.name}
-            onChange={(e) => onUpdate(product.barcode, "name", e.target.value)}
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
           />
         ) : (
           <span>{product.name}</span>
@@ -53,10 +62,8 @@ export default function ProductRowSettingsPage({
           <input
             type="number"
             className="w-20 border rounded px-2 py-1 text-right"
-            value={product.price}
-            onChange={(e) =>
-              onUpdate(product.barcode, "price", Number(e.target.value))
-            }
+            value={editPrice}
+            onChange={(e) => setEditPrice(Number(e.target.value))}
           />
         ) : (
           <span>{product.price} ₺</span>
@@ -67,10 +74,8 @@ export default function ProductRowSettingsPage({
           <input
             type="number"
             className="w-20 border rounded px-2 py-1 text-right"
-            value={product.qty}
-            onChange={(e) =>
-              onUpdate(product.barcode, "qty", Number(e.target.value))
-            }
+            value={editQty}
+            onChange={(e) => setEditQty(Number(e.target.value))}
           />
         ) : (
           <span>{product.qty}</span>
@@ -80,10 +85,7 @@ export default function ProductRowSettingsPage({
       <td className="border px-3 py-2 text-center space-x-2">
         {isEditing ? (
           <Button
-            onClick={() => {
-              setIsEditing(false);
-              toast.success(`${product.name} ürünü güncellendi`);
-            }}
+            onClick={handleSave}
             className="bg-green-500 hover:bg-green-600"
           >
             Kaydet
@@ -104,10 +106,10 @@ export default function ProductRowSettingsPage({
               )
             ) {
               onDelete(product.barcode);
-              toast.success(`${product.name} ürünü silindi`);
+              toast.success(`${product.name} ürünü silindi 🗑️`);
             }
           }}
-          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-xs shadow"
+          className="bg-red-500 hover:bg-red-600"
         >
           Sil
         </Button>

@@ -35,6 +35,7 @@ export default function ProductGrid({ products, onSelect }: ProductGridProps) {
       <div className="flex-1 max-h-[500px] overflow-y-auto pr-1">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {products
+            .sort((a, b) => a.name.localeCompare(b.name))
             .filter((p) => p.category === activeCategory)
             .map((product) => (
               <button

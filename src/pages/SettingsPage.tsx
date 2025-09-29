@@ -39,6 +39,8 @@ export default function SettingsPage() {
     icecek: number;
     agiralkol: number;
     kuruyemisler: number;
+    yiyecek: number;
+    sigara: number;
     diger: number;
   }>({
     bira: 24,
@@ -46,10 +48,11 @@ export default function SettingsPage() {
     icecek: 20,
     agiralkol: 12,
     kuruyemisler: 8,
+    yiyecek: 10,
+    sigara: 30,
     diger: 5,
   });
 
-  // 🔹 Ürünler için canlı dinleme
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
       const data = snapshot.docs.map((doc) => doc.data() as CartItem);
@@ -58,7 +61,6 @@ export default function SettingsPage() {
     return () => unsubscribe();
   }, []);
 
-  // 🔹 Stok seviyeleri
   useEffect(() => {
     const fetchStockLevels = async () => {
       const stockRef = doc(db, "settings", "stockLevels");
@@ -70,7 +72,6 @@ export default function SettingsPage() {
     fetchStockLevels();
   }, []);
 
-  // 🔹 Para birimi
   useEffect(() => {
     const fetchCurrency = async () => {
       const generalRef = doc(db, "settings", "general");
@@ -82,7 +83,6 @@ export default function SettingsPage() {
     fetchCurrency();
   }, []);
 
-  // 🔹 Yeni ürün ekleme
   const handleAddProduct = async () => {
     if (!newProduct.name.trim() || !newProduct.barcode.trim()) {
       toast.error("Ürün adı ve barkod zorunludur!");
@@ -124,34 +124,38 @@ export default function SettingsPage() {
     });
   };
 
-  // 🔹 Ürün silme
-  const handleDeleteProduct = async (id: string) => {
+  const handleDeleteProduct: (id: string) => Promise<void> = async (
+    id: string
+  ) => {
     await deleteDoc(doc(db, "products", id));
     toast.success("Ürün silindi ✅");
   };
 
-  // 🔹 Ürün güncelleme
-  const handleUpdateProduct = async (
+  const handleUpdateProduct: (
+    id: string,
+    field: keyof CartItem,
+    value: string | number
+  ) => Promise<void> = async (
     id: string,
     field: keyof CartItem,
     value: string | number
   ) => {
     await updateDoc(doc(db, "products", id), { [field]: value });
-    toast.success("Ürün güncellendi ✅");
   };
 
-  // 🔹 Stok işlemleri
   const updateStock = (key: keyof typeof stockLevels, value: number) => {
     setStockLevels((prev) => ({ ...prev, [key]: value }));
   };
 
-  const resetStockLevels = () => {
+  const resetStockLevels: React.MouseEventHandler<HTMLButtonElement> = () => {
     setStockLevels({
       bira: 24,
       cikolata: 15,
       icecek: 20,
       agiralkol: 12,
       kuruyemisler: 8,
+      yiyecek: 10,
+      sigara: 30,
       diger: 5,
     });
   };
@@ -162,7 +166,6 @@ export default function SettingsPage() {
     toast.success("Stok seviyeleri kaydedildi ✅");
   };
 
-  // 🔹 Para birimi kaydetme
   const saveCurrency = async () => {
     const generalRef = doc(db, "settings", "general");
     await setDoc(generalRef, { currency });
@@ -175,6 +178,8 @@ export default function SettingsPage() {
     icecek: "🥤 İçecek",
     agiralkol: "🥃 Ağır Alkol",
     kuruyemisler: "🥜 Kuruyemişler",
+    yiyecek: "🍔 Yiyecek",
+    sigara: "🚬 Sigara",
     diger: "📦 Diğer",
   };
 
@@ -291,6 +296,10 @@ export default function SettingsPage() {
             >
               ➕ Ürün Ekle
             </button>
+            <span className="text-sm text-gray-600">
+              Toplam <span className="font-bold">{productList.length}</span>{" "}
+              ürün
+            </span>
             <div className="flex items-center space-x-2">
               <button
                 type="button"

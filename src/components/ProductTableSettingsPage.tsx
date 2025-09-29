@@ -21,7 +21,7 @@ export default function ProductTableSettingsPage({
   );
 
   return (
-    <div className="">
+    <div>
       <table className="min-w-full border border-gray-200 text-sm">
         <thead className="bg-gray-100 text-gray-700">
           <tr>
