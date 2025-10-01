@@ -22,7 +22,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedRoute />}>
-          <Route path="/SalesPage" element={<SalesPage />} />
+          <Route path="/sales" element={<SalesPage />} />
           <Route path="/stock" element={<StockPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/settings" element={<SettingsPage />} />

@@ -42,9 +42,9 @@ export default function LoginPage() {
         login({
           uid: userDoc.uid,
           email: userDoc.email,
-          role: userDoc.role, // 🔑 Firestore’daki role
+          role: userDoc.role,
         });
-        navigate("/SalesPage", { replace: true });
+        navigate("/sales", { replace: true });
       } else {
         setError("Geçersiz kullanıcı adı veya şifre");
       }
