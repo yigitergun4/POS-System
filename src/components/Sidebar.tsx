@@ -48,7 +48,7 @@ export default function Sidebar({ className = "" }: SidebarProps) {
           label="Çıkış Yap"
           icon="🚪"
           danger
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/login")}
         />
       </div>
     </div>

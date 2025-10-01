@@ -44,7 +44,9 @@ export default function LoginPage() {
           email: userDoc.email,
           role: userDoc.role,
         });
+        console.log("LoginPage çalıştı");
         navigate("/sales", { replace: true });
+        console.log("navigate çalıştı");
       } else {
         setError("Geçersiz kullanıcı adı veya şifre");
       }
