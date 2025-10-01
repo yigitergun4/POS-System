@@ -20,6 +20,8 @@ import {
 import { Pie } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import type { Sale } from "../types/Sale";
+import SalesTable from "../components/SalesTableRows";
+
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 export default function DashboardPage() {
@@ -29,6 +31,9 @@ export default function DashboardPage() {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
+  const [activeReportTab, setActiveReportTab] = useState<"charts" | "list">(
+    "charts"
+  );
 
   const options: {
     key: "daily" | "weekly" | "monthly" | "custom";
@@ -41,12 +46,15 @@ export default function DashboardPage() {
   ];
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "sales"), (snapshot) => {
-      const data: Sale[] = snapshot.docs.map((doc) => ({
-        ...(doc.data() as Sale),
-      }));
-      setSales(data);
-    });
+    const unsubscribe: () => void = onSnapshot(
+      collection(db, "sales"),
+      (snapshot) => {
+        const data: Sale[] = snapshot.docs.map((doc) => ({
+          ...(doc.data() as Sale),
+        }));
+        setSales(data);
+      }
+    );
     return () => unsubscribe();
   }, []);
 
@@ -98,11 +106,9 @@ export default function DashboardPage() {
 
       return { totalSales, cashSales, cardSales, familySales, avgBasket };
     }, [filteredSales]);
+  const totalSalesWithoutFamily: number = totalSales - familySales;
 
-  const categoryData: {
-    labels: string[];
-    datasets: { data: number[]; backgroundColor: string[] }[];
-  } = useMemo(() => {
+  const categoryData = useMemo(() => {
     const categoryTotals: Record<string, number> = {};
     filteredSales.forEach((sale) => {
       sale.items.forEach((item) => {
@@ -118,12 +124,12 @@ export default function DashboardPage() {
         {
           data: Object.values(categoryTotals),
           backgroundColor: [
-            "#3b82f6", // blue
-            "#10b981", // green
-            "#f59e0b", // orange
-            "#ef4444", // red
-            "#8b5cf6", // purple
-            "#6b7280", // gray
+            "#3b82f6",
+            "#10b981",
+            "#f59e0b",
+            "#ef4444",
+            "#8b5cf6",
+            "#6b7280",
           ],
         },
       ],
@@ -142,16 +148,6 @@ export default function DashboardPage() {
       },
     ],
   };
-
-  const todayStart: number = Math.floor(
-    startOfDay(new Date()).getTime() / 1000
-  );
-  const todayEnd: number = Math.floor(endOfDay(new Date()).getTime() / 1000);
-
-  const todaysSales: Sale[] = sales.filter(
-    (sale) =>
-      sale.timestamp.seconds >= todayStart && sale.timestamp.seconds <= todayEnd
-  );
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -216,7 +212,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <SummaryCard
             title="Toplam Satış"
-            value={`₺ ${totalSales.toLocaleString()}`}
+            value={`₺ ${totalSalesWithoutFamily.toLocaleString()}`}
             color="blue"
           />
           <SummaryCard
@@ -240,100 +236,85 @@ export default function DashboardPage() {
             color="orange"
           />
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ChartCard title="Satış Trendleri">
+        <div className="flex space-x-4 border-b mb-6">
+          <button
+            onClick={() => setActiveReportTab("charts")}
+            className={`px-4 py-2 rounded-t-lg ${
+              activeReportTab === "charts"
+                ? "bg-blue-500 text-white"
+                : "bg-gray-100"
+            }`}
+          >
+            📊 Grafikler
+          </button>
+          <button
+            onClick={() => setActiveReportTab("list")}
+            className={`px-4 py-2 rounded-t-lg ${
+              activeReportTab === "list"
+                ? "bg-blue-500 text-white"
+                : "bg-gray-100"
+            }`}
+          >
+            📋 Satış Listesi
+          </button>
+        </div>
+        {activeReportTab === "charts" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {range !== "daily" ? (
-              filteredSales.length > 0 ? (
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={Object.values(
-                        filteredSales.reduce(
-                          (
-                            acc: Record<
-                              string,
-                              { date: string; total: number }
-                            >,
-                            sale
-                          ) => {
-                            const dateStr = format(
-                              new Date(sale.timestamp.seconds * 1000),
-                              "dd/MM/yyyy"
-                            );
-                            if (!acc[dateStr]) {
-                              acc[dateStr] = { date: dateStr, total: 0 };
-                            }
-                            acc[dateStr].total += sale.total;
-                            return acc;
-                          },
-                          {}
-                        )
-                      )}
-                      margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <RechartsTooltip />
-                      <Line
-                        type="monotone"
-                        dataKey="total"
-                        stroke="#3b82f6"
-                        strokeWidth={2}
-                        dot={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="h-64 flex items-center justify-center">
-                  <p className="text-gray-500 text-lg font-semibold">
-                    Seçilen aralıkta satış yok
-                  </p>
-                </div>
-              )
-            ) : (
-              <div className="h-64 flex items-center justify-center">
-                <p className="text-gray-400 text-base">
-                  📅 Günlük görünümde trend grafiği kapalı
-                </p>
-              </div>
-            )}
-          </ChartCard>
-          <ChartCard title="Ödeme Yöntemleri Dağılımı">
-            {range === "daily" ? (
-              todaysSales.length > 0 ? (
-                <div className="h-64 flex items-center justify-center">
-                  <div style={{ width: "300px", height: "300px" }}>
-                    <Pie
-                      data={paymentData}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: {
-                            position: "right",
-                            labels: {
-                              usePointStyle: true,
-                              padding: 20,
+              <ChartCard title="Satış Trendleri">
+                {filteredSales.length > 0 ? (
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={Object.values(
+                          filteredSales.reduce(
+                            (
+                              acc: Record<
+                                string,
+                                { date: string; total: number }
+                              >,
+                              sale
+                            ) => {
+                              const dateStr = format(
+                                new Date(sale.timestamp.seconds * 1000),
+                                "dd/MM/yyyy"
+                              );
+                              if (!acc[dateStr]) {
+                                acc[dateStr] = { date: dateStr, total: 0 };
+                              }
+                              acc[dateStr].total += sale.total;
+                              return acc;
                             },
-                          },
-                          tooltip: {
-                            enabled: true,
-                          },
-                        },
-                      }}
-                    />
+                            {}
+                          )
+                        )}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <RechartsTooltip />
+                        <Line
+                          type="monotone"
+                          dataKey="total"
+                          stroke="#3b82f6"
+                          strokeWidth={2}
+                          dot={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
-                </div>
-              ) : (
-                <div className="h-64 flex items-center justify-center">
-                  <p className="text-gray-500 text-lg font-semibold">
-                    Bugün satış yok
-                  </p>
-                </div>
-              )
+                ) : (
+                  <div className="h-64 flex items-center justify-center">
+                    <p className="text-gray-500 text-lg font-semibold">
+                      Seçilen aralıkta satış yok
+                    </p>
+                  </div>
+                )}
+              </ChartCard>
             ) : (
+              <></>
+            )}
+            <ChartCard title="Ödeme Yöntemleri Dağılımı">
               <div className="h-64 flex items-center justify-center">
                 <div style={{ width: "300px", height: "300px" }}>
                   <Pie
@@ -363,152 +344,64 @@ export default function DashboardPage() {
                               return `${context.label}: ₺${value.toLocaleString()} (${percentage}%)`;
                             },
                           },
-                          enabled: true,
                         },
                       },
                     }}
                   />
                 </div>
               </div>
-            )}
-          </ChartCard>
-          <ChartCard title="Kategori Bazlı Satışlar">
-            {categoryData.labels.length > 0 ? (
-              <div className="h-64 flex items-center justify-center">
-                <div style={{ width: "300px", height: "300px" }}>
-                  <Pie
-                    data={categoryData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: {
-                        legend: {
-                          position: "right",
-                          labels: {
-                            usePointStyle: true,
-                            padding: 20,
+            </ChartCard>
+
+            <ChartCard title="Kategori Bazlı Satışlar">
+              {categoryData.labels.length > 0 ? (
+                <div className="h-64 flex items-center justify-center">
+                  <div style={{ width: "300px", height: "300px" }}>
+                    <Pie
+                      data={categoryData}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: {
+                            position: "right",
+                            labels: {
+                              usePointStyle: true,
+                              padding: 20,
+                            },
                           },
-                        },
-                        tooltip: {
-                          callbacks: {
-                            label: function (context) {
-                              const value: number = context.raw as number;
-                              const total: number = (
-                                context.dataset.data as number[]
-                              ).reduce((a, b) => a + b, 0);
-                              const percentage: string = (
-                                (value / total) *
-                                100
-                              ).toFixed(1);
-                              return `${context.label}: ₺${value.toLocaleString()} (${percentage}%)`;
+                          tooltip: {
+                            callbacks: {
+                              label: function (context) {
+                                const value: number = context.raw as number;
+                                const total: number = (
+                                  context.dataset.data as number[]
+                                ).reduce((a, b) => a + b, 0);
+                                const percentage: string = (
+                                  (value / total) *
+                                  100
+                                ).toFixed(1);
+                                return `${context.label}: ₺${value.toLocaleString()} (${percentage}%)`;
+                              },
                             },
                           },
                         },
-                      },
-                    }}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="h-64 flex items-center justify-center">
-                <p className="text-gray-500 text-lg font-semibold">
-                  Bugün satış yok
-                </p>
-              </div>
-            )}
-          </ChartCard>
-          <ChartCard title="En Çok Satan Ürünler">
-            {range === "daily" ? (
-              todaysSales.length > 0 ? (
-                <div className="flex space-x-3 overflow-x-auto pb-2">
-                  {Object.entries(
-                    filteredSales
-                      .flatMap((s) => s.items)
-                      .reduce(
-                        (acc, item) => {
-                          const cat = item.category || "Diğer";
-                          if (!acc[cat]) acc[cat] = {};
-                          acc[cat][item.name] =
-                            (acc[cat][item.name] || 0) + item.qty;
-                          return acc;
-                        },
-                        {} as Record<string, Record<string, number>>
-                      )
-                  ).map(([category, items]) => (
-                    <div
-                      key={category}
-                      className="min-w-[250px] bg-white border border-gray-400 rounded-lg shadow p-4"
-                    >
-                      <h3 className="font-semibold text-gray-700 mb-2">
-                        {category}
-                      </h3>
-                      <ul className="divide-y divide-gray-200">
-                        {Object.entries(items)
-                          .sort((a, b) => b[1] - a[1])
-                          .slice(0, 5)
-                          .map(([name, qty]) => (
-                            <li
-                              key={name}
-                              className="flex justify-between py-2 text-sm text-gray-600"
-                            >
-                              <span>{name}</span>
-                              <span className="font-semibold">{qty} adet</span>
-                            </li>
-                          ))}
-                      </ul>
-                    </div>
-                  ))}
+                      }}
+                    />
+                  </div>
                 </div>
               ) : (
                 <div className="h-64 flex items-center justify-center">
                   <p className="text-gray-500 text-lg font-semibold">
-                    Bugün satış yok
+                    Seçilen aralıkta satış yok
                   </p>
                 </div>
-              )
-            ) : (
-              <div className="flex space-x-3 overflow-x-auto pb-2">
-                {Object.entries(
-                  filteredSales
-                    .flatMap((s) => s.items)
-                    .reduce(
-                      (acc, item) => {
-                        const cat = item.category || "Diğer";
-                        if (!acc[cat]) acc[cat] = {};
-                        acc[cat][item.name] =
-                          (acc[cat][item.name] || 0) + item.qty;
-                        return acc;
-                      },
-                      {} as Record<string, Record<string, number>>
-                    )
-                ).map(([category, items]) => (
-                  <div
-                    key={category}
-                    className="min-w-[250px] bg-white border border-gray-400 rounded-lg shadow p-4"
-                  >
-                    <h3 className="font-semibold text-gray-700 mb-2">
-                      {category}
-                    </h3>
-                    <ul className="divide-y divide-gray-200">
-                      {Object.entries(items)
-                        .sort((a, b) => b[1] - a[1])
-                        .slice(0, 5)
-                        .map(([name, qty]) => (
-                          <li
-                            key={name}
-                            className="flex justify-between py-2 text-sm text-gray-600"
-                          >
-                            <span>{name}</span>
-                            <span className="font-semibold">{qty} adet</span>
-                          </li>
-                        ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            )}
-          </ChartCard>
-        </div>
+              )}
+            </ChartCard>
+          </div>
+        )}
+        {activeReportTab === "list" && (
+          <SalesTable filteredSales={filteredSales} />
+        )}
       </div>
     </div>
   );

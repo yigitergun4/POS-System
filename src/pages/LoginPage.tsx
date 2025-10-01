@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { login } from "../lib/auth";
-import TouchKeyboard from "../components/TouchKeyboard";
+import { useAuth } from "../contexts/AuthContext";
+import { db } from "../lib/firebase";
+import { collection, query, where, getDocs, Query } from "firebase/firestore";
+//import TouchKeyboard from "../components/TouchKeyboard";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [error, setError] = useState<string>("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [keyboardOpen, setKeyboardOpen] = useState<boolean>(false);
   const [activeField, setActiveField] = useState<"username" | "password">(
     "username"
   );
@@ -25,36 +28,49 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
+
     try {
-      const ok = login(username, password);
-      if (ok) {
-        setKeyboardOpen(false);
+      const q: Query = query(
+        collection(db, "users"),
+        where("username", "==", username),
+        where("password", "==", password)
+      );
+      const snapshot = await getDocs(q);
+
+      if (!snapshot.empty) {
+        const userDoc = snapshot.docs[0].data();
+        login({
+          uid: userDoc.uid,
+          email: userDoc.email,
+          role: userDoc.role, // 🔑 Firestore’daki role
+        });
         navigate("/SalesPage", { replace: true });
       } else {
         setError("Geçersiz kullanıcı adı veya şifre");
       }
+    } catch (err) {
+      console.error(err);
+      setError("Bir hata oluştu, tekrar deneyin.");
     } finally {
       setLoading(false);
     }
   }
 
-  const keyboardValue: number =
-    activeField === "username" ? Number(username) : Number(password);
-  const keyboardOnChange: (next: number) => void = (next: number) =>
-    activeField === "username"
-      ? setUsername(next.toString())
-      : setPassword(next.toString());
+  // const keyboardValue: number =
+  //   activeField === "username" ? Number(username) : Number(password);
+  // const keyboardOnChange: (next: number) => void = (next: number) =>
+  //   activeField === "username"
+  //     ? setUsername(next.toString())
+  //     : setPassword(next.toString());
 
-  function handleKeyboardDone() {
-    if (activeField === "username") {
-      // Username'den password'e geç
-      setActiveField("password");
-      passRef.current?.focus();
-    } else {
-      // Password'den çık
-      setKeyboardOpen(false);
-    }
-  }
+  // function handleKeyboardDone() {
+  //   if (activeField === "username") {
+  //     setActiveField("password");
+  //     passRef.current?.focus();
+  //   } else {
+  //     setKeyboardOpen(false);
+  //   }
+  // }
 
   return (
     <div
@@ -125,18 +141,6 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
-          <div className="flex items-center justify-between">
-            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-2 border-gray-300"
-              />
-              Beni hatırla
-            </label>
-            <a className="text-sm font-medium text-blue-600" href="#">
-              Şifremi unuttum?
-            </a>
-          </div>
           <button
             type="submit"
             disabled={loading || !username || !password}
@@ -145,22 +149,16 @@ export default function LoginPage() {
             {loading ? "Giriş yapılıyor…" : "Giriş Yap"}
           </button>
         </form>
-        <p className="mt-4 text-center text-xs text-gray-600">
-          Giriş yaparak{" "}
-          <a className="text-blue-600 font-medium" href="#">
-            Şartlarımızı
-          </a>{" "}
-          kabul etmiş olursunuz.
-        </p>
       </div>
-      {keyboardOpen && (
+      {/* TODO: keyboard will be added later */}
+      {/* {keyboardOpen && (
         <TouchKeyboard
           onClose={() => setKeyboardOpen(false)}
           value={keyboardValue}
           onChange={keyboardOnChange}
           onDone={handleKeyboardDone}
         />
-      )}
+      )} */}
     </div>
   );
 }
