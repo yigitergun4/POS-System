@@ -2,6 +2,9 @@ import { useState } from "react";
 import { format } from "date-fns";
 import type { Sale } from "../types/Sale";
 import { useAuth } from "../contexts/AuthContext";
+import { deleteDoc, doc, runTransaction } from "firebase/firestore";
+import { db } from "../lib/firebase";
+import { toast } from "react-toastify";
 
 function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
   const [sortField, setSortField] = useState<"date" | "total" | "qty" | null>(
@@ -9,7 +12,6 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
   );
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const { user } = useAuth();
-  console.log(user);
 
   const handleSort: (field: "date" | "total" | "qty") => void = (field) => {
     if (sortField === field) {
@@ -20,8 +22,8 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
     }
   };
 
-  const sortedSales: Sale[] = [...filteredSales].sort((a: Sale, b: Sale) => {
-    if (!sortField) return b.timestamp.seconds - a.timestamp.seconds; // default en yeni
+  const sortedSales: Sale[] = [...filteredSales].sort((a, b) => {
+    if (!sortField) return b.timestamp.seconds - a.timestamp.seconds;
     let valA: number, valB: number;
 
     if (sortField === "date") {
@@ -37,6 +39,37 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
 
     return sortOrder === "asc" ? valA - valB : valB - valA;
   });
+
+  const handleDelete: (sale: Sale) => Promise<void> = async (sale) => {
+    if (!sale?.id) {
+      toast.error("Silinecek satış ID bulunamadı ❌");
+      return;
+    }
+
+    try {
+      await Promise.all(
+        sale.items.map(async (item) => {
+          if (!item.name) return;
+          const productRef = doc(db, "products", item.barcode!);
+
+          await runTransaction(db, async (transaction) => {
+            const productSnap = await transaction.get(productRef);
+            if (!productSnap.exists()) return;
+
+            const currentQty = productSnap.data().qty || 0;
+            transaction.update(productRef, {
+              qty: currentQty + item.qty,
+            });
+          });
+        })
+      );
+      await deleteDoc(doc(db, "sales", sale.id));
+      toast.success("Satış silindi ve stok geri eklendi ✅");
+    } catch (err) {
+      console.error("Satış silinirken hata:", err);
+      toast.error("Satış silinemedi ❌");
+    }
+  };
 
   return (
     <div className="bg-white shadow-md rounded-xl border border-gray-200 p-4 overflow-x-auto">
@@ -75,8 +108,8 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
         </thead>
         <tbody>
           {sortedSales.length > 0 ? (
-            sortedSales.map((sale: Sale, index: number) => (
-              <tr key={index} className="hover:bg-gray-50">
+            sortedSales.map((sale) => (
+              <tr key={sale.id} className="hover:bg-gray-50">
                 <td className="border px-3 py-2">
                   {format(
                     new Date(sale.timestamp.seconds * 1000),
@@ -103,7 +136,10 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
                 </td>
                 {user?.role === "admin" && (
                   <td className="border px-3 py-2 text-center">
-                    <button className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600">
+                    <button
+                      className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
+                      onClick={() => handleDelete(sale)}
+                    >
                       Satışı sil
                     </button>
                   </td>

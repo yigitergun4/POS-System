@@ -1,7 +1,14 @@
 export type Sale = {
   id: string;
+  timestamp: { seconds: number; nanoseconds: number };
   total: number;
   paymentMethod: "cash" | "card" | "family";
-  timestamp: { seconds: number; nanoseconds: number };
-  items: { name: string; qty: number; category?: string; price?: number }[];
+  items: {
+    name: string;
+    category?: string;
+    price: number;
+    qty: number;
+    cost?: number;
+    barcode: string;
+  }[];
 };

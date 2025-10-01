@@ -84,7 +84,7 @@ export default function SalesPage() {
     if (tab !== "barcode") return;
     const product = allProducts.find((p) => p.barcode === code);
     if (!product) {
-      console.log("Ürün bulunamadı: " + code);
+      "Ürün bulunamadı: " + code;
       return;
     }
 

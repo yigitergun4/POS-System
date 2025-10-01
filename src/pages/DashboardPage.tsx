@@ -46,15 +46,13 @@ export default function DashboardPage() {
   ];
 
   useEffect(() => {
-    const unsubscribe: () => void = onSnapshot(
-      collection(db, "sales"),
-      (snapshot) => {
-        const data: Sale[] = snapshot.docs.map((doc) => ({
-          ...(doc.data() as Sale),
-        }));
-        setSales(data);
-      }
-    );
+    const unsubscribe = onSnapshot(collection(db, "sales"), (snapshot) => {
+      const data: Sale[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...(doc.data() as Omit<Sale, "id">),
+      }));
+      setSales(data);
+    });
     return () => unsubscribe();
   }, []);
 
@@ -108,7 +106,10 @@ export default function DashboardPage() {
     }, [filteredSales]);
   const totalSalesWithoutFamily: number = totalSales - familySales;
 
-  const categoryData = useMemo(() => {
+  const categoryData: {
+    labels: string[];
+    datasets: { data: number[]; backgroundColor: string[] }[];
+  } = useMemo(() => {
     const categoryTotals: Record<string, number> = {};
     filteredSales.forEach((sale) => {
       sale.items.forEach((item) => {
@@ -351,7 +352,6 @@ export default function DashboardPage() {
                 </div>
               </div>
             </ChartCard>
-
             <ChartCard title="Kategori Bazlı Satışlar">
               {categoryData.labels.length > 0 ? (
                 <div className="h-64 flex items-center justify-center">

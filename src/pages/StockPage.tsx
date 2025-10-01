@@ -26,21 +26,20 @@ export default function StockPage() {
   >({});
   const [loading, setLoading] = useState<boolean>(true);
 
-  // 🔹 Firestore'dan ürünleri gerçek zamanlı çek
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
       const data = snapshot.docs.map((doc) => ({
-        ...(doc.data() as CartItem),
+        ...(doc.data() as Omit<CartItem, "id">),
+        id: doc.id,
       }));
       setStock(data);
     });
 
-    return () => unsubscribe(); // cleanup
+    return () => unsubscribe();
   }, []);
 
-  // 🔹 Firestore'dan kritik stok seviyelerini çek
   useEffect(() => {
-    const fetchStockLevels = async () => {
+    const fetchStockLevels: () => Promise<void> = async () => {
       try {
         setLoading(true);
 
@@ -80,13 +79,14 @@ export default function StockPage() {
     fetchStockLevels();
   }, []);
 
-  // 🔹 Ürünleri kategoriye göre gruplandır + kritik stoklara göre sırala
   const groupedStock: Record<string, typeof stock> = useMemo(() => {
     if (loading || stock.length === 0) {
       return {};
     }
 
-    const categories = Array.from(new Set(stock.map((p) => p.category)));
+    const categories: string[] = Array.from(
+      new Set(stock.map((p) => p.category))
+    );
     const groups: Record<string, typeof stock> = {};
 
     categories.forEach((cat) => {
