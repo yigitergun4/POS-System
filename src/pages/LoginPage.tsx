@@ -14,9 +14,9 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [keyboardOpen, setKeyboardOpen] = useState<boolean>(false);
-  const [activeField, setActiveField] = useState<"username" | "password">(
-    "username"
-  );
+  // const [activeField, setActiveField] = useState<"username" | "password">(
+  //   "username"
+  // );
   const userRef = useRef<HTMLInputElement>(null);
   const passRef = useRef<HTMLInputElement>(null);
 
@@ -107,7 +107,7 @@ export default function LoginPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               onFocus={() => {
-                setActiveField("username");
+                //setActiveField("username");
                 setKeyboardOpen(true);
               }}
               placeholder="admin"
@@ -126,7 +126,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onFocus={() => {
-                  setActiveField("password");
+                  //setActiveField("password");
                   setKeyboardOpen(true);
                 }}
                 placeholder="••••••••"

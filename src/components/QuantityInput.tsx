@@ -1,4 +1,3 @@
-import { useState } from "react";
 // import TouchKeyboard from "./TouchKeyboard";
 
 export default function QuantityInput({

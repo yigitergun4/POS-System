@@ -24,7 +24,7 @@ export default function SettingsPage() {
   const [filterText, setFilterText] = useState<string>("");
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [newProduct, setNewProduct] = useState<CartItem>({
-    id: 0,
+    id: "",
     name: "",
     price: 0,
     qty: 0,
@@ -115,7 +115,7 @@ export default function SettingsPage() {
   const handleCloseModal = () => {
     setShowAddModal(false);
     setNewProduct({
-      id: 0,
+      id: "",
       name: "",
       price: 0,
       qty: 0,
