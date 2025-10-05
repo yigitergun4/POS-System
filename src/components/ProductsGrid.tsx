@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { type CartItem } from "../types/Product";
 
 type ProductGridProps = {
@@ -14,6 +14,14 @@ export default function ProductGrid({ products, onSelect }: ProductGridProps) {
   const [activeCategory, setActiveCategory] = useState<string>(
     categories[0] || ""
   );
+  const [searchTerm, setSearchTerm] = useState<string>("");
+
+  const filteredProducts: CartItem[] = useMemo(() => {
+    return products
+      .filter((p) => p.category === activeCategory)
+      .filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [products, activeCategory, searchTerm]);
 
   return (
     <div className="h-full flex flex-col">
@@ -32,25 +40,31 @@ export default function ProductGrid({ products, onSelect }: ProductGridProps) {
           </button>
         ))}
       </div>
+      <div className="mb-3 px-1">
+        <input
+          type="text"
+          placeholder="Ürün ara..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
       <div className="flex-1 max-h-[500px] overflow-y-auto pr-1">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {products
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .filter((p) => p.category === activeCategory)
-            .map((product) => (
-              <button
-                key={product.id}
-                onClick={() => onSelect(product)}
-                className="bg-white border-2 border-gray-200 rounded-xl shadow-md p-5 flex flex-col items-center justify-center hover:border-blue-500 hover:shadow-lg active:scale-95 transition"
-              >
-                <span className="text-base font-semibold text-gray-800 text-center mb-1">
-                  {product.name}
-                </span>
-                <span className="text-lg font-bold text-green-600">
-                  {product.price} ₺
-                </span>
-              </button>
-            ))}
+          {filteredProducts.map((product: CartItem) => (
+            <button
+              key={product.id}
+              onClick={() => onSelect(product)}
+              className="bg-white border-2 border-gray-200 rounded-xl shadow-md p-5 flex flex-col items-center justify-center hover:border-blue-500 hover:shadow-lg active:scale-95 transition"
+            >
+              <span className="text-base font-semibold text-gray-800 text-center mb-1">
+                {product.name}
+              </span>
+              <span className="text-lg font-bold text-green-600">
+                {product.price} ₺
+              </span>
+            </button>
+          ))}
         </div>
       </div>
     </div>

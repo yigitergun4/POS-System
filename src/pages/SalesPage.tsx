@@ -16,7 +16,7 @@ import {
   increment,
 } from "firebase/firestore";
 import { type CartItem } from "../types/Product";
-import { format } from "date-fns"; // günlük ID için
+import { format } from "date-fns";
 
 export default function SalesPage() {
   const [allProducts, setAllProducts] = useState<CartItem[]>([]);
