@@ -267,39 +267,62 @@ export default function DashboardPage() {
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
-                        data={Object.values(
-                          filteredSales.reduce(
-                            (
-                              acc: Record<
-                                string,
-                                { date: string; total: number }
-                              >,
-                              sale
-                            ) => {
-                              const dateStr = format(
-                                new Date(sale.timestamp.seconds * 1000),
-                                "dd/MM/yyyy"
-                              );
-                              if (!acc[dateStr]) {
-                                acc[dateStr] = { date: dateStr, total: 0 };
-                              }
-                              acc[dateStr].total += sale.total;
-                              return acc;
-                            },
-                            {}
-                          )
-                        )}
+                        data={(() => {
+                          const nonFamilySales: Sale[] = filteredSales.filter(
+                            (s) => s.paymentMethod !== "family"
+                          );
+                          const dailyTotals: { date: number; total: number }[] =
+                            Array.from(
+                              nonFamilySales.reduce((acc, sale: Sale) => {
+                                const d: Date = new Date(
+                                  sale.timestamp.seconds * 1000
+                                );
+                                const dayStart: Date = new Date(
+                                  d.getFullYear(),
+                                  d.getMonth(),
+                                  d.getDate()
+                                );
+                                const key: number = dayStart.getTime();
+                                const prev: number = acc.get(key) ?? 0;
+                                acc.set(key, prev + sale.total);
+                                return acc;
+                              }, new Map<number, number>())
+                            )
+                              .sort((a, b) => a[0] - b[0])
+                              .map(([ts, total]: [number, number]) => ({
+                                date: ts,
+                                total,
+                              }));
+
+                          return dailyTotals;
+                        })()}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
+                        <XAxis
+                          dataKey="date"
+                          type="number"
+                          scale="time"
+                          domain={["dataMin", "dataMax"]}
+                          tickFormatter={(ts) => format(new Date(ts), "dd/MM")}
+                          interval="preserveStartEnd"
+                          minTickGap={10}
+                        />
                         <YAxis />
-                        <RechartsTooltip />
+                        <RechartsTooltip
+                          labelFormatter={(ts) =>
+                            format(new Date(ts), "dd/MM/yyyy")
+                          }
+                          formatter={(value: number) => [
+                            `₺${value.toFixed(2)}`,
+                            "Toplam Satış",
+                          ]}
+                        />
                         <Line
                           type="monotone"
                           dataKey="total"
                           stroke="#3b82f6"
                           strokeWidth={2}
-                          dot={false}
+                          dot={true}
                         />
                       </LineChart>
                     </ResponsiveContainer>
