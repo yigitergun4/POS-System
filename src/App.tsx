@@ -27,6 +27,7 @@ export default function App() {
     <BrowserRouter basename="/POS-System">
       <ToastContainer />
       <Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedRoute />}>
           <Route path="/sales" element={<SalesPage />} />
