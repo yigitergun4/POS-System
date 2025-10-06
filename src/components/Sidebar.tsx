@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import SidebarButton from "./SidebarButton";
 
 interface SidebarProps {
@@ -8,16 +9,25 @@ interface SidebarProps {
 export default function Sidebar({ className = "" }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
+
+  // Use router basename from Vite env to compute active state correctly
+  const routerBase: string =
+    (import.meta as any).env.BASE_URL?.replace(/\/$/, "") || "";
 
   const menuItems: { path: string; label: string; icon: string }[] = [
-    { path: "/POS-System/sales", label: "Satış", icon: "💰" },
-    { path: "/POS-System/dashboard", label: "Raporlar", icon: "📊" },
-    { path: "/POS-System/stock", label: "Stok", icon: "📦" },
-    { path: "/POS-System/settings", label: "Ayarlar", icon: "⚙️" },
+    { path: "/sales", label: "Satış", icon: "💰" },
+    { path: "/dashboard", label: "Raporlar", icon: "📊" },
+    { path: "/stock", label: "Stok", icon: "📦" },
+    { path: "/settings", label: "Ayarlar", icon: "⚙️" },
   ];
 
-  const isActive: (path: string) => boolean = (path: string): boolean =>
-    location.pathname === path;
+  const isActive: (path: string) => boolean = (path: string): boolean => {
+    const currentPath = location.pathname.startsWith(routerBase)
+      ? location.pathname.slice(routerBase.length)
+      : location.pathname;
+    return currentPath === path;
+  };
 
   return (
     <div
@@ -48,7 +58,10 @@ export default function Sidebar({ className = "" }: SidebarProps) {
           label="Çıkış Yap"
           icon="🚪"
           danger
-          onClick={() => navigate("/POS-System/login")}
+          onClick={() => {
+            logout();
+            navigate("/login");
+          }}
         />
       </div>
     </div>
