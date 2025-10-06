@@ -24,7 +24,7 @@ function ProtectedRoute() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/POS-System">
       <ToastContainer />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -34,7 +34,7 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
-        <Route path="*" element={<Navigate to="/sales" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
   );
