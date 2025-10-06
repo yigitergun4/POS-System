@@ -17,7 +17,7 @@ function ProtectedRoute() {
 
 export default function App() {
   return (
-    <BrowserRouter basename="/POS-System">
+    <BrowserRouter>
       <ToastContainer />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
