@@ -5,13 +5,20 @@ import StockPage from "./pages/StockPage";
 import DashboardPage from "./pages/DashboardPage";
 import SettingsPage from "./pages/SettingsPage";
 import Layout from "./components/Layout";
-import { isLoggedIn } from "./lib/auth";
 import { ToastContainer } from "react-toastify";
+import { useAuth } from "./contexts/AuthContext";
 
 function ProtectedRoute() {
-  if (!isLoggedIn()) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div className="text-center mt-20">Yükleniyor...</div>;
+  }
+
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
+
   return <Layout />;
 }
 
