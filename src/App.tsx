@@ -20,14 +20,14 @@ export default function App() {
     <BrowserRouter>
       <ToastContainer />
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/POS-System/login" element={<LoginPage />} />
         <Route element={<ProtectedRoute />}>
-          <Route path="/sales" element={<SalesPage />} />
-          <Route path="/stock" element={<StockPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/POS-System/sales" element={<SalesPage />} />
+          <Route path="/POS-System/stock" element={<StockPage />} />
+          <Route path="/POS-System/dashboard" element={<DashboardPage />} />
+          <Route path="/POS-System/settings" element={<SettingsPage />} />
         </Route>
-        <Route path="*" element={<Navigate to="/sales" replace />} />
+        <Route path="*" element={<Navigate to="/POS-System/sales" replace />} />
       </Routes>
     </BrowserRouter>
   );

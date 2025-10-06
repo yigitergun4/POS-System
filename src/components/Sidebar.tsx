@@ -10,10 +10,10 @@ export default function Sidebar({ className = "" }: SidebarProps) {
   const location = useLocation();
 
   const menuItems: { path: string; label: string; icon: string }[] = [
-    { path: "/SalesPage", label: "Satış", icon: "💰" },
-    { path: "/dashboard", label: "Raporlar", icon: "📊" },
-    { path: "/stock", label: "Stok", icon: "📦" },
-    { path: "/settings", label: "Ayarlar", icon: "⚙️" },
+    { path: "/POS-System/sales", label: "Satış", icon: "💰" },
+    { path: "/POS-System/dashboard", label: "Raporlar", icon: "📊" },
+    { path: "/POS-System/stock", label: "Stok", icon: "📦" },
+    { path: "/POS-System/settings", label: "Ayarlar", icon: "⚙️" },
   ];
 
   const isActive: (path: string) => boolean = (path: string): boolean =>
@@ -48,7 +48,7 @@ export default function Sidebar({ className = "" }: SidebarProps) {
           label="Çıkış Yap"
           icon="🚪"
           danger
-          onClick={() => navigate("/login")}
+          onClick={() => navigate("/POS-System/login")}
         />
       </div>
     </div>

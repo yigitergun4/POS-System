@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  base: "/",
+  base: "/POS-System/",
   build: {
     chunkSizeWarningLimit: 1600,
   },
