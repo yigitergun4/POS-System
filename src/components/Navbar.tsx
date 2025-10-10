@@ -6,21 +6,35 @@ export default function Navbar({ pageTitle }: { pageTitle: string }) {
   useEffect(() => {
     function updateTime() {
       const now: Date = new Date();
-      const formatted: string = new Intl.DateTimeFormat("tr-TR", {
-        dateStyle: "long",
-        timeStyle: "short",
+
+      const dayName: string = new Intl.DateTimeFormat("tr-TR", {
+        weekday: "long",
       }).format(now);
+
+      const datePart: string = new Intl.DateTimeFormat("tr-TR", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }).format(now);
+
+      const timePart: string = new Intl.DateTimeFormat("tr-TR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(now);
+
+      const formatted: string = `${dayName.charAt(0).toUpperCase() + dayName.slice(1)}, ${datePart} • ${timePart}`;
       setDateTime(formatted);
     }
 
-    updateTime(); // on first load
-    const timer = setInterval(updateTime, 60000); // update every minute
+    updateTime();
+    const timer: NodeJS.Timeout = setInterval(updateTime, 60000);
     return () => clearInterval(timer);
   }, []);
+
   return (
     <nav className="w-full bg-blue-600 text-white px-6 py-3 flex items-center justify-between shadow-md">
-      <span className="text-lg font-bold">{pageTitle} Sayfası </span>
-      <span className="text-lg font-bold">{dateTime}</span>
+      <span className="text-xl font-bold">{pageTitle} Sayfası</span>
+      <span className="text-sm md:text-lg font-semibold">{dateTime}</span>
     </nav>
   );
 }

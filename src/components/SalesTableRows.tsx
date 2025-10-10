@@ -71,6 +71,10 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
     }
   };
 
+  const deleteSale: (sale: Sale) => Promise<void> = async (sale) => {
+    await handleDelete(sale);
+  };
+
   return (
     <div className="bg-white shadow-md rounded-xl border border-gray-200 p-4 overflow-x-auto">
       <h2 className="text-lg font-semibold mb-4">📋 Satış Listesi</h2>
@@ -138,7 +142,15 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
                   <td className="border px-3 py-2 text-center">
                     <button
                       className="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
-                      onClick={() => handleDelete(sale)}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            "Satışı silmek istediğinize emin misiniz?"
+                          )
+                        ) {
+                          deleteSale(sale);
+                        }
+                      }}
                     >
                       Satışı sil
                     </button>
