@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import Navbar from "../components/Navbar";
 import SummaryCard from "../components/SummaryCardDashboardPage";
 import ChartCard from "../components/ChartCardDashboardPage";
+import ChatInterface from "../components/ChatInterface";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { Listbox } from "@headlessui/react";
@@ -34,6 +35,7 @@ export default function DashboardPage() {
   const [activeReportTab, setActiveReportTab] = useState<"charts" | "list">(
     "charts"
   );
+  const [showChat, setShowChat] = useState(false);
 
   const options: {
     key: "daily" | "weekly" | "monthly" | "custom";
@@ -159,6 +161,12 @@ export default function DashboardPage() {
             Raporlar ve Analizler
           </h1>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowChat(true)}
+              className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
+            >
+              🤖 Maje
+            </button>
             <Listbox value={range} onChange={(val) => setRange(val)}>
               <div className="relative">
                 <Listbox.Button className="w-40 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm flex justify-between items-center">
@@ -339,41 +347,49 @@ export default function DashboardPage() {
               <></>
             )}
             <ChartCard title="Ödeme Yöntemleri Dağılımı">
-              <div className="h-64 flex items-center justify-center">
-                <div style={{ width: "300px", height: "300px" }}>
-                  <Pie
-                    data={paymentData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: {
-                        legend: {
-                          position: "right",
-                          labels: {
-                            usePointStyle: true,
-                            padding: 20,
+              {categoryData.labels.length > 0 ? (
+                <div className="h-64 flex items-center justify-center">
+                  <div style={{ width: "300px", height: "300px" }}>
+                    <Pie
+                      data={paymentData}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: {
+                            position: "right",
+                            labels: {
+                              usePointStyle: true,
+                              padding: 20,
+                            },
                           },
-                        },
-                        tooltip: {
-                          callbacks: {
-                            label: function (context) {
-                              const value: number = context.raw as number;
-                              const total: number = (
-                                context.dataset.data as number[]
-                              ).reduce((a, b) => a + b, 0);
-                              const percentage: string = (
-                                (value / total) *
-                                100
-                              ).toFixed(1);
-                              return `${context.label}: ₺${value.toLocaleString()} (${percentage}%)`;
+                          tooltip: {
+                            callbacks: {
+                              label: function (context) {
+                                const value: number = context.raw as number;
+                                const total: number = (
+                                  context.dataset.data as number[]
+                                ).reduce((a, b) => a + b, 0);
+                                const percentage: string = (
+                                  (value / total) *
+                                  100
+                                ).toFixed(1);
+                                return `${context.label}: ₺${value.toLocaleString()} (${percentage}%)`;
+                              },
                             },
                           },
                         },
-                      },
-                    }}
-                  />
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="h-64 flex items-center justify-center">
+                  <p className="text-gray-500 text-lg font-semibold">
+                    Seçilen aralıkta satış yok
+                  </p>
+                </div>
+              )}
             </ChartCard>
             <ChartCard title="Kategori Bazlı Satışlar">
               {categoryData.labels.length > 0 ? (
@@ -426,6 +442,7 @@ export default function DashboardPage() {
           <SalesTable filteredSales={filteredSales} />
         )}
       </div>
+      {showChat && <ChatInterface onClose={() => setShowChat(false)} />}
     </div>
   );
 }

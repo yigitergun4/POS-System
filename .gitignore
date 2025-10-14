@@ -23,3 +23,6 @@ dist-ssr
 
 .env
 .env.* 
+getToken.js
+serviceAccount.json
+test-firebase.js
