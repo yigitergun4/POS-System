@@ -16,6 +16,17 @@ import ProductTableSettingsPage from "../components/ProductTableSettingsPage";
 import AddProductModalSettingsPage from "../components/AddProductModalSettingsPage";
 import { toast } from "react-toastify";
 
+type StockLevels = {
+  bira: number;
+  cikolata: number;
+  icecek: number;
+  agiralkol: number;
+  kuruyemisler: number;
+  yiyecek: number;
+  sigara: number;
+  diger: number;
+};
+
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<"general" | "stock" | "products">(
     "general"
@@ -33,16 +44,7 @@ export default function SettingsPage() {
   });
   const [currency, setCurrency] = useState<string>("TL");
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [stockLevels, setStockLevels] = useState<{
-    bira: number;
-    cikolata: number;
-    icecek: number;
-    agiralkol: number;
-    kuruyemisler: number;
-    yiyecek: number;
-    sigara: number;
-    diger: number;
-  }>({
+  const [stockLevels, setStockLevels] = useState<StockLevels>({
     bira: 24,
     cikolata: 15,
     icecek: 20,
@@ -54,26 +56,31 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
-      const data = snapshot.docs.map((doc) => doc.data() as CartItem);
-      setProductList(data);
-    });
+    const unsubscribe: () => void = onSnapshot(
+      collection(db, "products"),
+      (snapshot) => {
+        const data: CartItem[] = snapshot.docs.map(
+          (doc) => doc.data() as CartItem
+        );
+        setProductList(data);
+      }
+    );
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    const fetchStockLevels = async () => {
+    const fetchStockLevels: () => Promise<void> = async () => {
       const stockRef = doc(db, "settings", "stockLevels");
       const snapshot = await getDoc(stockRef);
       if (snapshot.exists()) {
-        setStockLevels(snapshot.data() as typeof stockLevels);
+        setStockLevels(snapshot.data() as StockLevels);
       }
     };
     fetchStockLevels();
   }, []);
 
   useEffect(() => {
-    const fetchCurrency = async () => {
+    const fetchCurrency: () => Promise<void> = async () => {
       const generalRef = doc(db, "settings", "general");
       const snapshot = await getDoc(generalRef);
       if (snapshot.exists()) {
@@ -83,7 +90,7 @@ export default function SettingsPage() {
     fetchCurrency();
   }, []);
 
-  const handleAddProduct = async () => {
+  const handleAddProduct: () => Promise<void> = async () => {
     if (!newProduct.name.trim() || !newProduct.barcode.trim()) {
       toast.error("Ürün adı ve barkod zorunludur!");
       return;
@@ -111,8 +118,7 @@ export default function SettingsPage() {
     handleCloseModal();
   };
 
-  // 🔹 Modal kapatma
-  const handleCloseModal = () => {
+  const handleCloseModal: () => void = () => {
     setShowAddModal(false);
     setNewProduct({
       id: "",
@@ -143,7 +149,10 @@ export default function SettingsPage() {
     await updateDoc(doc(db, "products", id), { [field]: value });
   };
 
-  const updateStock = (key: keyof typeof stockLevels, value: number) => {
+  const updateStock: (key: keyof typeof stockLevels, value: number) => void = (
+    key: keyof typeof stockLevels,
+    value: number
+  ) => {
     setStockLevels((prev) => ({ ...prev, [key]: value }));
   };
 

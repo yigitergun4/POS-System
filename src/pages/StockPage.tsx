@@ -90,7 +90,7 @@ export default function StockPage() {
     const groups: Record<string, typeof stock> = {};
 
     categories.forEach((cat) => {
-      const key = categoryKeyMap[cat] || cat.toLowerCase();
+      const key: string = categoryKeyMap[cat] || cat.toLowerCase();
       const threshold: number = stockThresholds[key] ?? 0;
 
       groups[cat] = stock

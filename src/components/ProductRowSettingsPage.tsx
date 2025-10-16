@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CartItem } from "../types/Product";
 import { toast } from "react-toastify";
+import { db } from "../lib/firebase";
+import { collection, getDocs, query } from "firebase/firestore";
 
 type Props = {
   product: CartItem;
@@ -28,19 +30,30 @@ export default function ProductRowSettingsPage({
   onUpdate,
   onDelete,
 }: Props) {
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editName, setEditName] = useState<string>(product.name);
+  const [editPrice, setEditPrice] = useState<number>(product.price);
+  const [editQty, setEditQty] = useState<number>(product.qty);
+  const [editCategory, setEditCategory] = useState<string>(product.category);
+  const [categories, setCategories] = useState<string[]>([]);
 
-  // geçici alanlar
-  const [editName, setEditName] = useState(product.name);
-  const [editPrice, setEditPrice] = useState(product.price);
-  const [editQty, setEditQty] = useState(product.qty);
+  useEffect(() => {
+    if (isEditing) {
+      getDocs(query(collection(db, "products"))).then((docs) => {
+        setCategories(
+          Array.from(new Set(docs.docs.map((doc) => doc.data().category) ?? []))
+        );
+      });
+    }
+  }, [isEditing]);
 
-  const handleSave = () => {
+  const handleSave: () => void = () => {
     onUpdate(product.barcode, "name", editName);
     onUpdate(product.barcode, "price", editPrice);
     onUpdate(product.barcode, "qty", editQty);
+    onUpdate(product.barcode, "category", editCategory);
     setIsEditing(false);
-    toast.success(`${product.name} ürünü güncellendi ✅`);
+    toast.success(`${product.name} ürünü güncellendi.`);
   };
 
   return (
@@ -81,7 +94,23 @@ export default function ProductRowSettingsPage({
           <span>{product.qty}</span>
         )}
       </td>
-      <td className="border px-3 py-2 text-center">{product.category}</td>
+      <td className="border px-3 py-2 text-center">
+        {isEditing ? (
+          <select
+            className="w-full border rounded px-2 py-1"
+            value={editCategory}
+            onChange={(e) => setEditCategory(e.target.value)}
+          >
+            {categories.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span>{product.category}</span>
+        )}
+      </td>
       <td className="border px-3 py-2 text-center space-x-2">
         {isEditing ? (
           <Button
