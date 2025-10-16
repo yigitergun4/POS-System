@@ -5,6 +5,7 @@ export type CartItem = {
   qty: number;
   barcode: string;
   category: string;
+  threshold?: number;
 };
 
 export interface Product {
@@ -14,4 +15,5 @@ export interface Product {
   barcode: string;
   category: string;
   stock?: number;
+  threshold?: number;
 }

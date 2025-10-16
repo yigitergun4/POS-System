@@ -6,8 +6,7 @@ import type { CartItem } from "../types/Product";
 
 interface ChatRequest {
   question: string;
-  salesData: Sale[];
-  productsData: CartItem[];
+  today: string;
 }
 
 interface ChatResponse {
@@ -76,32 +75,52 @@ class ChatService {
         day: "2-digit",
       }).format(new Date());
 
-      const requestData = { question, today };
+      const requestData: ChatRequest & { today: string } = {
+        question,
+        today,
+      };
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+      if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`; // only if provided
 
       const response: Response = await fetch(this.webhookUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`,
-        },
+        headers,
         body: JSON.stringify(requestData),
       });
-      console.log("Response:", response);
 
-      if (!response.ok)
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        let details = "";
+        try {
+          const text = await response.text();
+          details = text?.slice(0, 500);
+        } catch {}
+        throw new Error(
+          `HTTP ${response.status} ${response.statusText}${details ? `: ${details}` : ""}`
+        );
+      }
 
-      const data = await response.json();
-      console.log("Data:", data);
+      // Try JSON first, fall back to text
+      let data: any;
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = { message: { content: text } };
+      }
 
       return {
         content: data?.message?.content || "Yanıt alınamadı.",
         timestamp: new Date().toISOString(),
         status: "success",
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error("Chat request failed:", error);
-      throw error;
+      throw new Error(error?.message || String(error));
     }
   }
 

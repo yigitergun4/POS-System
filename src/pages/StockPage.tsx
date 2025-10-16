@@ -1,5 +1,5 @@
 import Navbar from "../components/Navbar";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   collection,
   doc,
@@ -10,14 +10,7 @@ import {
 import { db } from "../lib/firebase";
 import type { CartItem } from "../types/Product";
 
-const categoryKeyMap: Record<string, string> = {
-  Bira: "bira",
-  Çikolata: "cikolata",
-  İçecek: "icecek",
-  "Ağır Alkol": "agiralkol",
-  Kuruyemişler: "kuruyemisler",
-  Diğer: "diger",
-};
+// Deprecated: category-level thresholds removed; keep map here only if needed elsewhere
 
 export default function StockPage() {
   const [stock, setStock] = useState<CartItem[]>([]);
@@ -25,10 +18,11 @@ export default function StockPage() {
     Record<string, number>
   >({});
   const [loading, setLoading] = useState<boolean>(true);
+  const [filterText, setFilterText] = useState<string>("");
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
+      const data: CartItem[] = snapshot.docs.map((doc) => ({
         ...(doc.data() as Omit<CartItem, "id">),
         id: doc.id,
       }));
@@ -50,27 +44,13 @@ export default function StockPage() {
           const data = snapshot.data() as Record<string, number>;
           setStockThresholds(data);
         } else {
-          const defaultThresholds: Record<string, number> = {
-            bira: 24,
-            cikolata: 15,
-            icecek: 20,
-            agiralkol: 12,
-            kuruyemisler: 8,
-            diger: 5,
-          };
+          const defaultThresholds: Record<string, number> = {};
           await setDoc(stockRef, defaultThresholds);
           setStockThresholds(defaultThresholds);
         }
       } catch (err) {
         console.error("❌ Stok eşikleri yüklenemedi:", err);
-        setStockThresholds({
-          bira: 24,
-          cikolata: 15,
-          icecek: 20,
-          agiralkol: 12,
-          kuruyemisler: 8,
-          diger: 5,
-        });
+        setStockThresholds({});
       } finally {
         setLoading(false);
       }
@@ -79,31 +59,37 @@ export default function StockPage() {
     fetchStockLevels();
   }, []);
 
-  const groupedStock: Record<string, typeof stock> = useMemo(() => {
+  const groupedStock: Record<string, CartItem[]> = useMemo(() => {
     if (loading || stock.length === 0) {
       return {};
     }
+    const lower: string = filterText.trim().toLowerCase();
+    const filtered: CartItem[] = lower
+      ? stock.filter(
+          (p) =>
+            p.name.toLowerCase().includes(lower) || p.barcode.includes(lower)
+        )
+      : stock;
 
     const categories: string[] = Array.from(
-      new Set(stock.map((p) => p.category))
+      new Set(filtered.map((p) => p.category))
     );
-    const groups: Record<string, typeof stock> = {};
+    const groups: Record<string, CartItem[]> = {};
 
     categories.forEach((cat) => {
-      const key: string = categoryKeyMap[cat] || cat.toLowerCase();
-      const threshold: number = stockThresholds[key] ?? 0;
-
-      groups[cat] = stock
+      groups[cat] = filtered
         .filter((p) => p.category === cat)
         .sort((a, b) => {
-          const aLow = a.qty <= threshold ? 1 : 0;
-          const bLow = b.qty <= threshold ? 1 : 0;
+          const aThreshold = stockThresholds[a.barcode] ?? a.threshold ?? 0;
+          const bThreshold = stockThresholds[b.barcode] ?? b.threshold ?? 0;
+          const aLow = a.qty <= aThreshold ? 1 : 0;
+          const bLow = b.qty <= bThreshold ? 1 : 0;
           if (aLow !== bLow) return bLow - aLow;
           return a.qty - b.qty;
         });
     });
     return groups;
-  }, [stock, stockThresholds, loading]);
+  }, [stock, stockThresholds, loading, filterText]);
 
   if (loading) {
     return (
@@ -119,23 +105,44 @@ export default function StockPage() {
     );
   }
 
-  const categories = Object.keys(groupedStock);
+  const categories: string[] = Object.keys(groupedStock);
+
+  const clearFilter: () => void = () => {
+    setFilterText("");
+  };
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       <Navbar pageTitle="Stok" />
       <div className="flex-1 p-6 flex flex-col overflow-hidden">
-        <h1 className="text-2xl font-semibold mb-6 text-gray-800">
-          Stok Takibi
-        </h1>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 p-2">
+            <input
+              type="text"
+              placeholder="Barkod veya ürün adı ara..."
+              className="border px-3 py-2 rounded-lg text-sm w-72"
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+            />
+            {filterText && (
+              <button
+                type="button"
+                onClick={clearFilter}
+                className="px-3 py-2 rounded-lg bg-gray-200 text-sm"
+              >
+                Temizle
+              </button>
+            )}
+          </div>
+        </div>
         <div className="flex-1 overflow-auto space-y-8 pr-2">
           {categories.map((cat) => {
-            const key: string = categoryKeyMap[cat] || cat.toLowerCase();
-            const threshold: number = stockThresholds[key] ?? 0;
-
             const criticalCount: number =
-              groupedStock[cat]?.filter((item) => item.qty <= threshold)
-                .length || 0;
+              groupedStock[cat]?.filter((item) => {
+                const itemThreshold =
+                  stockThresholds[item.barcode] ?? item.threshold ?? 0;
+                return item.qty <= itemThreshold;
+              }).length || 0;
 
             return (
               <div
@@ -146,7 +153,7 @@ export default function StockPage() {
                   <h2 className="text-lg font-bold text-gray-800">{cat}</h2>
                   <div className="text-right">
                     <span className="text-sm text-gray-600">
-                      Kritik eşik: {threshold}
+                      Kritik eşikler ürün bazlı
                     </span>
                     <br />
                     <span className="text-lg text-red-600 font-bold">
@@ -174,7 +181,9 @@ export default function StockPage() {
                     </thead>
                     <tbody>
                       {groupedStock[cat]?.map((item) => {
-                        const isLow = item.qty <= threshold;
+                        const itemThreshold =
+                          stockThresholds[item.barcode] ?? item.threshold ?? 0;
+                        const isLow = item.qty <= itemThreshold;
                         return (
                           <tr
                             key={item.barcode}
@@ -205,6 +214,11 @@ export default function StockPage() {
               </div>
             );
           })}
+          {categories.length === 0 && (
+            <div className="text-center text-gray-500 py-12">
+              Sonuç bulunamadı
+            </div>
+          )}
         </div>
       </div>
     </div>

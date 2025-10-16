@@ -35,6 +35,9 @@ export default function ProductRowSettingsPage({
   const [editPrice, setEditPrice] = useState<number>(product.price);
   const [editQty, setEditQty] = useState<number>(product.qty);
   const [editCategory, setEditCategory] = useState<string>(product.category);
+  const [editThreshold, setEditThreshold] = useState<number>(
+    product.threshold ?? 0
+  );
   const [categories, setCategories] = useState<string[]>([]);
 
   useEffect(() => {
@@ -52,6 +55,7 @@ export default function ProductRowSettingsPage({
     onUpdate(product.barcode, "price", editPrice);
     onUpdate(product.barcode, "qty", editQty);
     onUpdate(product.barcode, "category", editCategory);
+    onUpdate(product.barcode, "threshold", editThreshold);
     setIsEditing(false);
     toast.success(`${product.name} ürünü güncellendi.`);
   };
@@ -92,6 +96,19 @@ export default function ProductRowSettingsPage({
           />
         ) : (
           <span>{product.qty}</span>
+        )}
+      </td>
+      <td className="border px-3 py-2 text-center">
+        {isEditing ? (
+          <input
+            type="number"
+            className="w-20 border rounded px-2 py-1 text-right"
+            value={editThreshold}
+            min={0}
+            onChange={(e) => setEditThreshold(Number(e.target.value))}
+          />
+        ) : (
+          <span>{product.threshold ?? 0}</span>
         )}
       </td>
       <td className="border px-3 py-2 text-center">

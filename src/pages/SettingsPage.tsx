@@ -16,21 +16,10 @@ import ProductTableSettingsPage from "../components/ProductTableSettingsPage";
 import AddProductModalSettingsPage from "../components/AddProductModalSettingsPage";
 import { toast } from "react-toastify";
 
-type StockLevels = {
-  bira: number;
-  cikolata: number;
-  icecek: number;
-  agiralkol: number;
-  kuruyemisler: number;
-  yiyecek: number;
-  sigara: number;
-  diger: number;
-};
+type ActiveTab = "general" | "products";
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<"general" | "stock" | "products">(
-    "general"
-  );
+  const [activeTab, setActiveTab] = useState<ActiveTab>("general");
   const [productList, setProductList] = useState<CartItem[]>([]);
   const [filterText, setFilterText] = useState<string>("");
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
@@ -41,19 +30,10 @@ export default function SettingsPage() {
     qty: 0,
     barcode: "",
     category: "Diğer",
+    threshold: 0,
   });
   const [currency, setCurrency] = useState<string>("TL");
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [stockLevels, setStockLevels] = useState<StockLevels>({
-    bira: 24,
-    cikolata: 15,
-    icecek: 20,
-    agiralkol: 12,
-    kuruyemisler: 8,
-    yiyecek: 10,
-    sigara: 30,
-    diger: 5,
-  });
 
   useEffect(() => {
     const unsubscribe: () => void = onSnapshot(
@@ -66,17 +46,6 @@ export default function SettingsPage() {
       }
     );
     return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const fetchStockLevels: () => Promise<void> = async () => {
-      const stockRef = doc(db, "settings", "stockLevels");
-      const snapshot = await getDoc(stockRef);
-      if (snapshot.exists()) {
-        setStockLevels(snapshot.data() as StockLevels);
-      }
-    };
-    fetchStockLevels();
   }, []);
 
   useEffect(() => {
@@ -127,6 +96,7 @@ export default function SettingsPage() {
       qty: 0,
       barcode: "",
       category: "Diğer",
+      threshold: 0,
     });
   };
 
@@ -149,47 +119,10 @@ export default function SettingsPage() {
     await updateDoc(doc(db, "products", id), { [field]: value });
   };
 
-  const updateStock: (key: keyof typeof stockLevels, value: number) => void = (
-    key: keyof typeof stockLevels,
-    value: number
-  ) => {
-    setStockLevels((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const resetStockLevels: React.MouseEventHandler<HTMLButtonElement> = () => {
-    setStockLevels({
-      bira: 24,
-      cikolata: 15,
-      icecek: 20,
-      agiralkol: 12,
-      kuruyemisler: 8,
-      yiyecek: 10,
-      sigara: 30,
-      diger: 5,
-    });
-  };
-
-  const saveStockLevels = async () => {
-    const stockRef = doc(db, "settings", "stockLevels");
-    await setDoc(stockRef, stockLevels);
-    toast.success("Stok seviyeleri kaydedildi ✅");
-  };
-
-  const saveCurrency = async () => {
+  const saveCurrency: () => Promise<void> = async () => {
     const generalRef = doc(db, "settings", "general");
     await setDoc(generalRef, { currency });
     toast.success("Para birimi kaydedildi ✅");
-  };
-
-  const STOCK_LABELS: Record<string, string> = {
-    bira: "🍺 Bira",
-    cikolata: "🍫 Çikolata",
-    icecek: "🥤 İçecek",
-    agiralkol: "🥃 Ağır Alkol",
-    kuruyemisler: "🥜 Kuruyemişler",
-    yiyecek: "🍔 Yiyecek",
-    sigara: "🚬 Sigara",
-    diger: "📦 Diğer",
   };
 
   return (
@@ -203,14 +136,6 @@ export default function SettingsPage() {
           }`}
         >
           ⚙️ Genel Ayarlar
-        </button>
-        <button
-          onClick={() => setActiveTab("stock")}
-          className={`px-4 py-2 rounded-lg ${
-            activeTab === "stock" ? "bg-blue-500 text-white" : "bg-gray-100"
-          }`}
-        >
-          📦 Stok Ayarları
         </button>
         <button
           onClick={() => setActiveTab("products")}
@@ -248,56 +173,8 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
-      {activeTab === "stock" && (
-        <div className="p-6 bg-white shadow-md rounded-xl border border-gray-200 m-6">
-          <h2 className="text-lg font-semibold mb-4">📦 Stok Ayarları</h2>
-          <p className="text-sm text-gray-600 mb-6">
-            Buradan kategori bazlı kritik stok seviyelerini belirleyebilirsiniz.
-          </p>
-          <div className="space-y-4">
-            {Object.entries(stockLevels).map(([key, value]) => (
-              <label
-                key={key}
-                className="flex justify-between items-center text-sm"
-              >
-                <span>{STOCK_LABELS[key] || key}</span>
-                <input
-                  type="number"
-                  min={0}
-                  className={`border rounded-lg px-2 py-1 w-24 text-right ${
-                    value <= 5
-                      ? "border-red-500 text-red-600 font-semibold"
-                      : "border-gray-300"
-                  }`}
-                  value={value}
-                  onChange={(e) =>
-                    updateStock(
-                      key as keyof typeof stockLevels,
-                      Number(e.target.value)
-                    )
-                  }
-                />
-              </label>
-            ))}
-          </div>
-          <div className="flex justify-end mt-6 space-x-2">
-            <button
-              onClick={resetStockLevels}
-              className="px-4 py-2 rounded-lg bg-gray-200 text-sm"
-            >
-              Sıfırla
-            </button>
-            <button
-              onClick={saveStockLevels}
-              className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm"
-            >
-              Kaydet
-            </button>
-          </div>
-        </div>
-      )}
       {activeTab === "products" && (
-        <div className="p-6 bg-white shadow-md rounded-xl border border-gray-200 overflow-y-auto max-h-[585px] m-6">
+        <div className="p-6 bg-white shadow-md rounded-xl border border-gray-200 max-h-[calc(100vh-12rem)] overflow-y-auto m-6">
           <div className="flex justify-between items-center mb-4">
             <button
               onClick={() => setShowAddModal(true)}

@@ -88,6 +88,25 @@ export default function AddProductModalSettingsPage({
           </div>
         </div>
         <div>
+          <label className="block text-sm text-gray-600 mb-1">
+            Kritik Eşik
+          </label>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            className="border rounded-lg px-2 py-2 w-full text-right"
+            value={newProduct.threshold ?? 0}
+            onInput={(e) => {
+              const value = (e.target as HTMLInputElement).value.replace(
+                /\D/g,
+                ""
+              );
+              setNewProduct({ ...newProduct, threshold: Number(value) || 0 });
+            }}
+          />
+        </div>
+        <div>
           <label className="block text-sm text-gray-600 mb-1">Kategori</label>
           <select
             className="border rounded-lg px-2 py-2 w-full"

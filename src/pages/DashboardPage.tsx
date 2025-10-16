@@ -3,7 +3,8 @@ import Navbar from "../components/Navbar";
 import SummaryCard from "../components/SummaryCardDashboardPage";
 import ChartCard from "../components/ChartCardDashboardPage";
 import ChatInterface from "../components/ChatInterface";
-import DatePicker from "react-datepicker";
+import DatePicker, { registerLocale } from "react-datepicker";
+import { tr } from "date-fns/locale";
 import "react-datepicker/dist/react-datepicker.css";
 import { Listbox } from "@headlessui/react";
 import { db } from "../lib/firebase";
@@ -23,7 +24,11 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import type { Sale } from "../types/Sale";
 import SalesTable from "../components/SalesTableRows";
 
+// Register Chart.js elements
 ChartJS.register(ArcElement, Tooltip, Legend);
+
+// Register Turkish locale for date picker
+registerLocale("tr", tr);
 
 export default function DashboardPage() {
   const [range, setRange] = useState<"daily" | "weekly" | "monthly" | "custom">(
@@ -87,12 +92,12 @@ export default function DashboardPage() {
 
   const { totalSales, cashSales, cardSales, familySales, avgBasket } =
     useMemo(() => {
-      let totalSales = 0;
-      let cashSales = 0;
-      let cardSales = 0;
-      let familySales = 0;
+      let totalSales: number = 0;
+      let cashSales: number = 0;
+      let cardSales: number = 0;
+      let familySales: number = 0;
 
-      filteredSales.forEach((s) => {
+      filteredSales.forEach((s: Sale) => {
         totalSales += s.total;
         if (s.paymentMethod === "cash") cashSales += s.total;
         if (s.paymentMethod === "card") cardSales += s.total;
@@ -193,6 +198,7 @@ export default function DashboardPage() {
             {range === "custom" && (
               <div className="flex items-center gap-2 text-sm">
                 <DatePicker
+                  locale="tr"
                   selected={startDate}
                   onChange={(date) => setStartDate(date)}
                   selectsStart
@@ -204,6 +210,7 @@ export default function DashboardPage() {
                 />
                 <span>-</span>
                 <DatePicker
+                  locale="tr"
                   selected={endDate}
                   onChange={(date) => setEndDate(date)}
                   selectsEnd
