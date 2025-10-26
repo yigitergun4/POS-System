@@ -84,6 +84,7 @@ class ChatService {
         "Content-Type": "application/json",
       };
       const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+      console.log(apiKey);
       if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`; // only if provided
 
       const response: Response = await fetch(this.webhookUrl, {
