@@ -92,6 +92,7 @@ class ChatService {
         headers,
         body: JSON.stringify(requestData),
       });
+      console.log(response);
 
       if (!response.ok) {
         let details = "";
@@ -114,8 +115,36 @@ class ChatService {
         data = { message: { content: text } };
       }
 
+      console.log("n8n yanıtı:", data);
+
+      // n8n'den gelen yanıtın farklı yapılarını destekle
+      let content: string = "Yanıt alınamadı.";
+
+      if (typeof data === "string") {
+        content = data;
+      } else if (data?.[0]?.output?.[0]?.content?.[0]?.text) {
+        // n8n array formatı
+        content = data[0].output[0].content[0].text;
+        console.log("1");
+      } else if (data?.content) {
+        content = data.content;
+        console.log("2");
+      } else if (data?.message?.content) {
+        content = data.message.content;
+        console.log("3");
+      } else if (data?.message && typeof data.message === "string") {
+        content = data.message;
+        console.log("4");
+      } else if (data?.output) {
+        content = data.output[0].content[0].text;
+        console.log("5");
+      } else if (data?.result) {
+        content = data.result;
+        console.log("6");
+      }
+
       return {
-        content: data?.message?.content || "Yanıt alınamadı.",
+        content,
         timestamp: new Date().toISOString(),
         status: "success",
       };

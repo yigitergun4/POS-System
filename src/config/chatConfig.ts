@@ -1,9 +1,7 @@
 // Chat service configuration
 export const CHAT_CONFIG = {
   // n8n webhook URL - production'da environment variable'dan alınmalı
-  WEBHOOK_URL:
-    import.meta.env.VITE_N8N_WEBHOOK_URL ||
-    "http://localhost:5678/webhook/411cf12f-ae46-4be5-9cf4-bcf0c564f0dc",
+  WEBHOOK_URL: import.meta.env.VITE_N8N_WEBHOOK_URL,
 
   // Request timeout (milliseconds)
   TIMEOUT: 30000,

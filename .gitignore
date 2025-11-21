@@ -10,7 +10,7 @@ node_modules
 dist
 dist-ssr
 *.local
-
+.gitignore
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -26,3 +26,4 @@ dist-ssr
 getToken.js
 serviceAccount.json
 test-firebase.js
+docker-compose.yml
