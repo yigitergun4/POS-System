@@ -17,10 +17,7 @@ interface ChatResponse {
 
 class ChatService {
   private webhookUrl: string;
-  private config: typeof CHAT_CONFIG;
-
   constructor(config: typeof CHAT_CONFIG) {
-    this.config = config;
     this.webhookUrl = config.WEBHOOK_URL;
   }
 

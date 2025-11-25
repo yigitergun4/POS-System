@@ -10,7 +10,7 @@ export default function ChatInterface({ onClose }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      text: "Merhaba! Satışlarınız ve ürünleriniz hakkında sorularınızı sorabilirsiniz. Size nasıl yardımcı olabilirim?",
+      text: "Merhaba! Satışlarınız hakkındaki sorularınızı sorabilirsiniz. Size nasıl yardımcı olabilirim?",
       sender: "assistant",
       timestamp: new Date(),
     },

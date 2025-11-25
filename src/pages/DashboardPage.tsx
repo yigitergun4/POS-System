@@ -41,6 +41,7 @@ export default function DashboardPage() {
     "charts"
   );
   const [showChat, setShowChat] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("Tümü");
 
   const options: {
     key: "daily" | "weekly" | "monthly" | "custom";
@@ -113,6 +114,59 @@ export default function DashboardPage() {
     }, [filteredSales]);
   const totalSalesWithoutFamily: number = totalSales - familySales;
 
+  // Extract unique categories from sales data
+  const categories = useMemo(() => {
+    const categorySet = new Set<string>(["Tümü"]);
+    filteredSales.forEach((sale) => {
+      sale.items.forEach((item) => {
+        if (item.category) categorySet.add(item.category);
+      });
+    });
+    return Array.from(categorySet);
+  }, [filteredSales]);
+
+  // Category-filtered KPIs
+  const categoryKPIs = useMemo(() => {
+    let categorySales = 0;
+    let categoryUnits = 0;
+    let categoryTransactions = 0;
+
+    if (selectedCategory === "Tümü") {
+      filteredSales.forEach((sale) => {
+        if (sale.paymentMethod !== "family") {
+          categorySales += sale.total;
+          categoryTransactions++;
+          sale.items.forEach((item) => {
+            categoryUnits += item.qty;
+          });
+        }
+      });
+    } else {
+      const relevantSales = new Set<string>();
+      filteredSales.forEach((sale) => {
+        if (sale.paymentMethod !== "family") {
+          sale.items.forEach((item) => {
+            if (item.category === selectedCategory) {
+              categorySales += (item.price || 0) * item.qty;
+              categoryUnits += item.qty;
+              relevantSales.add(sale.id);
+            }
+          });
+        }
+      });
+      categoryTransactions = relevantSales.size;
+    }
+
+    const avgTransaction = categoryTransactions > 0 ? categorySales / categoryTransactions : 0;
+
+    return {
+      categorySales,
+      categoryUnits,
+      categoryTransactions,
+      avgTransaction,
+    };
+  }, [filteredSales, selectedCategory]);
+
   const categoryData: {
     labels: string[];
     datasets: { data: number[]; backgroundColor: string[] }[];
@@ -143,6 +197,66 @@ export default function DashboardPage() {
       ],
     };
   }, [filteredSales]);
+
+  // Hourly sales data
+  const hourlySalesData = useMemo(() => {
+    const hourlyTotals: { [hour: number]: number } = {};
+    
+    // Initialize all hours
+    for (let i = 0; i < 24; i++) {
+      hourlyTotals[i] = 0;
+    }
+
+    filteredSales.forEach((sale) => {
+      if (sale.paymentMethod !== "family") {
+        const saleDate = new Date(sale.timestamp.seconds * 1000);
+        const hour = saleDate.getHours();
+        
+        if (selectedCategory === "Tümü") {
+          hourlyTotals[hour] += sale.total;
+        } else {
+          sale.items.forEach((item) => {
+            if (item.category === selectedCategory) {
+              hourlyTotals[hour] += (item.price || 0) * item.qty;
+            }
+          });
+        }
+      }
+    });
+
+    return Object.entries(hourlyTotals).map(([hour, total]) => ({
+      hour: parseInt(hour),
+      total,
+      label: `${hour}:00`,
+    }));
+  }, [filteredSales, selectedCategory]);
+
+  // Top selling products
+  const topProducts = useMemo(() => {
+    const productStats: Record<string, { qty: number; revenue: number }> = {};
+
+    filteredSales.forEach((sale) => {
+      if (sale.paymentMethod !== "family") {
+        sale.items.forEach((item) => {
+          if (selectedCategory === "Tümü" || item.category === selectedCategory) {
+            if (!productStats[item.name]) {
+              productStats[item.name] = { qty: 0, revenue: 0 };
+            }
+            productStats[item.name].qty += item.qty;
+            productStats[item.name].revenue += (item.price || 0) * item.qty;
+          }
+        });
+      }
+    });
+
+    return Object.entries(productStats)
+      .map(([name, stats]) => ({
+        name,
+        ...stats,
+      }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 10);
+  }, [filteredSales, selectedCategory]);
 
   const paymentData: {
     labels: string[];
@@ -225,6 +339,9 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+        
+
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <SummaryCard
             title="Toplam Satış"
@@ -277,6 +394,7 @@ export default function DashboardPage() {
         {activeReportTab === "charts" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {range !== "daily" ? (
+              <div className="col-span-1 lg:col-span-2">
               <ChartCard title="Satış Trendleri">
                 {filteredSales.length > 0 ? (
                   <div className="h-64">
@@ -350,9 +468,254 @@ export default function DashboardPage() {
                   </div>
                 )}
               </ChartCard>
+              </div>
             ) : (
               <></>
             )}
+
+            {/* Hourly Sales Chart */}
+            <div className="col-span-1 lg:col-span-2">
+              <ChartCard title="⏰ Saatlik Satış Hareketliliği">
+                {filteredSales.length > 0 ? (
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={hourlySalesData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis
+                          dataKey="label"
+                          stroke="#6b7280"
+                          style={{ fontSize: "12px" }}
+                          interval={1}
+                        />
+                        <YAxis
+                          stroke="#6b7280"
+                          style={{ fontSize: "12px" }}
+                          tickFormatter={(value) =>
+                            `₺${value.toLocaleString("tr-TR", {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            })}`
+                          }
+                        />
+                        <RechartsTooltip
+                          contentStyle={{
+                            backgroundColor: "rgba(255, 255, 255, 0.95)",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "8px",
+                            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+                          }}
+                          formatter={(value: number) => [
+                            `₺${value.toLocaleString("tr-TR", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}`,
+                            "Satış",
+                          ]}
+                          labelFormatter={(label) => `Saat: ${label}`}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="total"
+                          stroke="#3b82f6"
+                          strokeWidth={3}
+                          dot={{
+                            fill: "#3b82f6",
+                            strokeWidth: 2,
+                            r: 4,
+                            stroke: "#fff",
+                          }}
+                          activeDot={{
+                            r: 6,
+                            fill: "#2563eb",
+                            stroke: "#fff",
+                            strokeWidth: 2,
+                          }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-80 flex items-center justify-center">
+                    <p className="text-gray-500 text-lg font-semibold">
+                      Seçilen aralıkta satış yok
+                    </p>
+                  </div>
+                )}
+              </ChartCard>
+                      {/* Category Filter Section */}
+        <div className="mt-8">
+          <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                🏪 Kategori Bazlı Analiz
+              </h2>
+              <Listbox value={selectedCategory} onChange={setSelectedCategory}>
+                <div className="relative">
+                  <Listbox.Button className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2 min-w-[180px] justify-between">
+                    <span className="font-medium">{selectedCategory}</span>
+                    <span>▾</span>
+                  </Listbox.Button>
+                  <Listbox.Options className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-20 max-h-60 overflow-auto">
+                    {categories.map((category) => (
+                      <Listbox.Option
+                        key={category}
+                        value={category}
+                        className={({ active }) =>
+                          `cursor-pointer px-4 py-3 text-sm transition-colors ${
+                            active
+                              ? "bg-blue-50 text-blue-700"
+                              : "text-gray-700 hover:bg-gray-50"
+                          } ${
+                            selectedCategory === category
+                              ? "font-semibold bg-blue-100"
+                              : ""
+                          }`
+                        }
+                      >
+                        {category}
+                      </Listbox.Option>
+                    ))}
+                  </Listbox.Options>
+                </div>
+              </Listbox>
+            </div>
+
+            {/* Category KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Total Category Sales */}
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-blue-100 text-sm font-medium">
+                    Kategori Satış
+                  </span>
+                  <span className="text-2xl">💰</span>
+                </div>
+                <div className="text-3xl font-bold">
+                  ₺{categoryKPIs.categorySales.toLocaleString("tr-TR", {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  })}
+                </div>
+              </div>
+
+              {/* Units Sold */}
+              <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-green-100 text-sm font-medium">
+                    Satılan Adet
+                  </span>
+                  <span className="text-2xl">📦</span>
+                </div>
+                <div className="text-3xl font-bold">
+                  {categoryKPIs.categoryUnits.toLocaleString("tr-TR")}
+                </div>
+                <div className="text-green-100 text-xs mt-1">Ürün adedi</div>
+              </div>
+
+              {/* Number of Transactions */}
+              <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-purple-100 text-sm font-medium">
+                    İşlem Sayısı
+                  </span>
+                  <span className="text-2xl">🧾</span>
+                </div>
+                <div className="text-3xl font-bold">
+                  {categoryKPIs.categoryTransactions.toLocaleString("tr-TR")}
+                </div>
+                <div className="text-purple-100 text-xs mt-1">Toplam işlem</div>
+              </div>
+
+              {/* Average Transaction */}
+              <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-orange-100 text-sm font-medium">
+                    Ortalama İşlem
+                  </span>
+                  <span className="text-2xl">📊</span>
+                </div>
+                <div className="text-3xl font-bold">
+                  ₺{categoryKPIs.avgTransaction.toLocaleString("tr-TR", {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  })}
+                </div>
+                <div className="text-orange-100 text-xs mt-1">İşlem başına</div>
+              </div>
+            </div>
+          </div>
+        </div>
+            </div>
+            
+
+            {/* Top Selling Products */}
+            <div className="col-span-1 lg:col-span-2">
+              <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+                <div className="p-6 border-b border-gray-100">
+                  <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    🏆 En Çok Satılan Ürünler (Top 10)
+                  </h2>
+                </div>
+                <div className="p-6">
+                  {topProducts.length > 0 ? (
+                    <div className="space-y-4">
+                      {topProducts.map((product, index) => (
+                        <div
+                          key={product.name}
+                          className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors group relative overflow-hidden"
+                        >
+                          {/* Progress Bar Background */}
+                          <div
+                            className="absolute left-0 top-0 bottom-0 bg-blue-100 opacity-0 group-hover:opacity-20 transition-opacity"
+                            style={{
+                              width: `${(product.qty / topProducts[0].qty) * 100}%`,
+                            }}
+                          />
+                          
+                          <div className="flex items-center gap-4 z-10">
+                            <div
+                              className={`w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm ${
+                                index === 0
+                                  ? "bg-yellow-400 text-yellow-900"
+                                  : index === 1
+                                  ? "bg-gray-300 text-gray-800"
+                                  : index === 2
+                                  ? "bg-orange-300 text-orange-900"
+                                  : "bg-blue-100 text-blue-600"
+                              }`}
+                            >
+                              {index + 1}
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-gray-800">
+                                {product.name}
+                              </h3>
+                              <p className="text-sm text-gray-500">
+                                {product.qty.toLocaleString("tr-TR")} adet satıldı
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right z-10">
+                            <div className="font-bold text-gray-800">
+                              ₺
+                              {product.revenue.toLocaleString("tr-TR", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </div>
+                            <div className="text-xs text-gray-500">Toplam Ciro</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 text-gray-500">
+                      Bu kategoride satış bulunamadı.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
             <ChartCard title="Ödeme Yöntemleri Dağılımı">
               {categoryData.labels.length > 0 ? (
                 <div className="h-64 flex items-center justify-center">
