@@ -1,24 +1,44 @@
+import { useState, useEffect } from "react";
 import ProductRowSettingsPage from "./ProductRowSettingsPage";
+import Pagination from "./Pagination";
+import { DEFAULT_PAGE_SIZE, type PageSizeOption } from "../config";
 import type { CartItem } from "../types/Product";
+import type { ProductTableSettingsPageProps } from "../types/components/index";
 
-type Props = {
-  products: CartItem[];
-  filterText: string;
-  onUpdate: (id: string, field: keyof CartItem, value: string | number) => void;
-  onDelete: (id: string) => void;
-};
+
 
 export default function ProductTableSettingsPage({
   products,
   filterText,
   onUpdate,
   onDelete,
-}: Props) {
+}: ProductTableSettingsPageProps) {
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<PageSizeOption>(DEFAULT_PAGE_SIZE as PageSizeOption);
+
   const filtered: CartItem[] = products.filter(
     (p) =>
       p.name.toLowerCase().includes(filterText.toLowerCase()) ||
       p.barcode.includes(filterText)
   );
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterText]);
+
+  // Calculate paginated products
+  const startIndex: number = (currentPage - 1) * pageSize;
+  const paginatedProducts: CartItem[] = filtered.slice(startIndex, startIndex + pageSize);
+
+  const handlePageChange: (page: number) => void = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange: (size: PageSizeOption) => void = (size: PageSizeOption) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   return (
     <div>
@@ -35,7 +55,7 @@ export default function ProductTableSettingsPage({
           </tr>
         </thead>
         <tbody>
-          {filtered.map((p) => (
+          {paginatedProducts.map((p) => (
             <ProductRowSettingsPage
               key={p.barcode}
               product={p}
@@ -45,6 +65,14 @@ export default function ProductTableSettingsPage({
           ))}
         </tbody>
       </table>
+      <Pagination
+        totalItems={filtered.length}
+        pageSize={pageSize}
+        currentPage={currentPage}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
+      />
     </div>
   );
 }
+

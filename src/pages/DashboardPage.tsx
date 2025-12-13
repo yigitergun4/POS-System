@@ -91,27 +91,85 @@ export default function DashboardPage() {
     });
   }, [sales, range, startDate, endDate]);
 
-  const { totalSales, cashSales, cardSales, familySales, avgBasket } =
+  // Main KPIs - now filtered by selected category
+  const { totalSales, cashSales, cardSales, familySales, avgBasket, transactionCounts } =
     useMemo(() => {
       let totalSales: number = 0;
       let cashSales: number = 0;
       let cardSales: number = 0;
       let familySales: number = 0;
+      const cashTransactions = new Set<string>();
+      const cardTransactions = new Set<string>();
+      const familyTransactions = new Set<string>();
+      const allTransactions = new Set<string>();
 
       filteredSales.forEach((s: Sale) => {
-        totalSales += s.total;
-        if (s.paymentMethod === "cash") cashSales += s.total;
-        if (s.paymentMethod === "card") cardSales += s.total;
-        if (s.paymentMethod === "family") familySales += s.total;
+        if (selectedCategory === "Tümü") {
+          // No category filter - use full sale totals
+          totalSales += s.total;
+          if (s.paymentMethod === "cash") {
+            cashSales += s.total;
+            cashTransactions.add(s.id);
+          }
+          if (s.paymentMethod === "card") {
+            cardSales += s.total;
+            cardTransactions.add(s.id);
+          }
+          if (s.paymentMethod === "family") {
+            familySales += s.total;
+            familyTransactions.add(s.id);
+          }
+          allTransactions.add(s.id);
+        } else {
+          // Filter by category - calculate from items
+          let saleTotal: number = 0;
+          s.items.forEach((item) => {
+            if (item.category === selectedCategory) {
+              const itemTotal: number = (item.price || 0) * item.qty;
+              saleTotal += itemTotal;
+            }
+          });
+
+          if (saleTotal > 0) {
+            totalSales += saleTotal;
+            if (s.paymentMethod === "cash") {
+              cashSales += saleTotal;
+              cashTransactions.add(s.id);
+            }
+            if (s.paymentMethod === "card") {
+              cardSales += saleTotal;
+              cardTransactions.add(s.id);
+            }
+            if (s.paymentMethod === "family") {
+              familySales += saleTotal;
+              familyTransactions.add(s.id);
+            }
+            allTransactions.add(s.id);
+          }
+        }
       });
 
+      const nonFamilyTransactions: number = cashTransactions.size + cardTransactions.size;
       const avgBasket: string =
-        filteredSales.length > 0
-          ? (totalSales / filteredSales.length).toFixed(2)
+        nonFamilyTransactions > 0
+          ? ((totalSales - familySales) / nonFamilyTransactions).toFixed(2)
           : "0";
 
-      return { totalSales, cashSales, cardSales, familySales, avgBasket };
-    }, [filteredSales]);
+      return {
+        totalSales,
+        cashSales,
+        cardSales,
+        familySales,
+        avgBasket,
+        transactionCounts: {
+          total: allTransactions.size,
+          cash: cashTransactions.size,
+          card: cardTransactions.size,
+          family: familyTransactions.size,
+          nonFamily: nonFamilyTransactions,
+        },
+      };
+    }, [filteredSales, selectedCategory]);
   const totalSalesWithoutFamily: number = totalSales - familySales;
 
   // Extract unique categories from sales data
@@ -286,13 +344,48 @@ export default function DashboardPage() {
             >
               🤖 Maje
             </button>
+            {/* Category Filter - Only visible in charts tab */}
+            {activeReportTab === "charts" && (
+              <Listbox value={selectedCategory} onChange={setSelectedCategory}>
+                <div className="relative">
+                  <Listbox.Button className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2 min-w-[150px] justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <span>📦</span>
+                      <span className="font-medium">{selectedCategory}</span>
+                    </span>
+                    <span>▾</span>
+                  </Listbox.Button>
+                  <Listbox.Options className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-60 overflow-auto">
+                    {categories.map((category) => (
+                      <Listbox.Option
+                        key={category}
+                        value={category}
+                        className={({ active }) =>
+                          `cursor-pointer px-4 py-2.5 text-sm transition-colors ${
+                            active
+                              ? "bg-purple-50 text-purple-700"
+                              : "text-gray-700 hover:bg-gray-50"
+                          } ${
+                            selectedCategory === category
+                              ? "font-semibold bg-purple-100"
+                              : ""
+                          }`
+                        }
+                      >
+                        {category}
+                      </Listbox.Option>
+                    ))}
+                  </Listbox.Options>
+                </div>
+              </Listbox>
+            )}
             <Listbox value={range} onChange={(val) => setRange(val)}>
               <div className="relative">
                 <Listbox.Button className="w-40 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm flex justify-between items-center">
                   {options.find((o) => o.key === range)?.label}
                   <span>▾</span>
                 </Listbox.Button>
-                <Listbox.Options className="absolute mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                <Listbox.Options className="absolute mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
                   {options.map(({ key, label }) => (
                     <Listbox.Option
                       key={key}
@@ -310,7 +403,7 @@ export default function DashboardPage() {
               </div>
             </Listbox>
             {range === "custom" && (
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-sm relative z-50">
                 <DatePicker
                   locale="tr"
                   selected={startDate}
@@ -321,6 +414,7 @@ export default function DashboardPage() {
                   placeholderText="Başlangıç"
                   className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
                   dateFormat="dd/MM/yyyy"
+                  popperClassName="z-50"
                 />
                 <span>-</span>
                 <DatePicker
@@ -334,6 +428,7 @@ export default function DashboardPage() {
                   placeholderText="Bitiş"
                   className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
                   dateFormat="dd/MM/yyyy"
+                  popperClassName="z-50"
                 />
               </div>
             )}
@@ -344,48 +439,59 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <SummaryCard
-            title="Toplam Satış"
-            value={`₺ ${totalSalesWithoutFamily.toLocaleString()}`}
+            title={selectedCategory === "Tümü" ? "Toplam Satış" : `${selectedCategory} Satış`}
+            value={`₺${totalSalesWithoutFamily.toLocaleString("tr-TR")}`}
             color="blue"
+            icon="💰"
+            subtitle={`${transactionCounts.nonFamily} işlem`}
           />
           <SummaryCard
             title="Nakit Satış"
-            value={`₺ ${cashSales.toLocaleString()}`}
+            value={`₺${cashSales.toLocaleString("tr-TR")}`}
             color="green"
+            icon="💵"
+            subtitle={`${transactionCounts.cash} işlem`}
           />
           <SummaryCard
             title="Kart Satış"
-            value={`₺ ${cardSales.toLocaleString()}`}
+            value={`₺${cardSales.toLocaleString("tr-TR")}`}
             color="purple"
+            icon="💳"
+            subtitle={`${transactionCounts.card} işlem`}
           />
           <SummaryCard
             title="Aile Satış"
-            value={`₺ ${familySales.toLocaleString()}`}
+            value={`₺${familySales.toLocaleString("tr-TR")}`}
             color="red"
+            icon="👨‍👩‍👧"
+            subtitle={`${transactionCounts.family} işlem`}
           />
           <SummaryCard
             title="Ortalama Sepet"
-            value={`₺ ${avgBasket}`}
+            value={`₺${Number(avgBasket).toLocaleString("tr-TR")}`}
             color="orange"
+            icon="🛒"
+            subtitle="İşlem başına"
           />
         </div>
-        <div className="flex space-x-4 border-b mb-6">
+        {/* Tab Buttons */}
+        <div className="flex gap-2 p-1 bg-gray-100 rounded-xl w-fit mb-6 w-full">
           <button
             onClick={() => setActiveReportTab("charts")}
-            className={`px-4 py-2 rounded-t-lg ${
+            className={`px-6 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${
               activeReportTab === "charts"
-                ? "bg-blue-500 text-white"
-                : "bg-gray-100"
+                ? "bg-white text-gray-900 shadow-md"
+                : "text-gray-600 hover:text-gray-900"
             }`}
           >
             📊 Grafikler
           </button>
           <button
             onClick={() => setActiveReportTab("list")}
-            className={`px-4 py-2 rounded-t-lg ${
+            className={`px-6 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${
               activeReportTab === "list"
-                ? "bg-blue-500 text-white"
-                : "bg-gray-100"
+                ? "bg-white text-gray-900 shadow-md"
+                : "text-gray-600 hover:text-gray-900"
             }`}
           >
             📋 Satış Listesi
@@ -395,18 +501,17 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {range !== "daily" ? (
               <div className="col-span-1 lg:col-span-2">
-              <ChartCard title="Satış Trendleri">
+              <ChartCard title="Satış Trendleri" icon="📈" subtitle={selectedCategory === "Tümü" ? "Günlük satış grafiği" : `${selectedCategory} - Günlük`}>
                 {filteredSales.length > 0 ? (
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
                         data={(() => {
-                          const nonFamilySales: Sale[] = filteredSales.filter(
-                            (s) => s.paymentMethod !== "family"
-                          );
                           const dailyTotals: { date: number; total: number }[] =
                             Array.from(
-                              nonFamilySales.reduce((acc, sale: Sale) => {
+                              filteredSales.reduce((acc, sale: Sale) => {
+                                if (sale.paymentMethod === "family") return acc;
+                                
                                 const d: Date = new Date(
                                   sale.timestamp.seconds * 1000
                                 );
@@ -417,7 +522,22 @@ export default function DashboardPage() {
                                 );
                                 const key: number = dayStart.getTime();
                                 const prev: number = acc.get(key) ?? 0;
-                                acc.set(key, prev + sale.total);
+                                
+                                // Calculate sale total based on category filter
+                                let saleTotal: number = 0;
+                                if (selectedCategory === "Tümü") {
+                                  saleTotal = sale.total;
+                                } else {
+                                  sale.items.forEach((item) => {
+                                    if (item.category === selectedCategory) {
+                                      saleTotal += (item.price || 0) * item.qty;
+                                    }
+                                  });
+                                }
+                                
+                                if (saleTotal > 0) {
+                                  acc.set(key, prev + saleTotal);
+                                }
                                 return acc;
                               }, new Map<number, number>())
                             )
@@ -475,7 +595,7 @@ export default function DashboardPage() {
 
             {/* Hourly Sales Chart */}
             <div className="col-span-1 lg:col-span-2">
-              <ChartCard title="⏰ Saatlik Satış Hareketliliği">
+              <ChartCard title="Saatlik Satış Hareketliliği" icon="⏰" subtitle="Saat bazlı satış dağılımı">
                 {filteredSales.length > 0 ? (
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
@@ -542,42 +662,14 @@ export default function DashboardPage() {
                   </div>
                 )}
               </ChartCard>
-                      {/* Category Filter Section */}
+                      {/* Category Stats Section */}
         <div className="mt-8">
           <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                 🏪 Kategori Bazlı Analiz
+                <span className="text-sm font-normal text-gray-500">({selectedCategory})</span>
               </h2>
-              <Listbox value={selectedCategory} onChange={setSelectedCategory}>
-                <div className="relative">
-                  <Listbox.Button className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2 min-w-[180px] justify-between">
-                    <span className="font-medium">{selectedCategory}</span>
-                    <span>▾</span>
-                  </Listbox.Button>
-                  <Listbox.Options className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-20 max-h-60 overflow-auto">
-                    {categories.map((category) => (
-                      <Listbox.Option
-                        key={category}
-                        value={category}
-                        className={({ active }) =>
-                          `cursor-pointer px-4 py-3 text-sm transition-colors ${
-                            active
-                              ? "bg-blue-50 text-blue-700"
-                              : "text-gray-700 hover:bg-gray-50"
-                          } ${
-                            selectedCategory === category
-                              ? "font-semibold bg-blue-100"
-                              : ""
-                          }`
-                        }
-                      >
-                        {category}
-                      </Listbox.Option>
-                    ))}
-                  </Listbox.Options>
-                </div>
-              </Listbox>
             </div>
 
             {/* Category KPI Cards */}
@@ -716,7 +808,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-            <ChartCard title="Ödeme Yöntemleri Dağılımı">
+            <ChartCard title="Ödeme Yöntemleri Dağılımı" icon="💳" subtitle="Ödeme türlerine göre">
               {categoryData.labels.length > 0 ? (
                 <div className="h-64 flex items-center justify-center">
                   <div style={{ width: "300px", height: "300px" }}>
@@ -761,7 +853,7 @@ export default function DashboardPage() {
                 </div>
               )}
             </ChartCard>
-            <ChartCard title="Kategori Bazlı Satışlar">
+            <ChartCard title="Kategori Bazlı Satışlar" icon="📦" subtitle="Ürün kategorilerine göre">
               {categoryData.labels.length > 0 ? (
                 <div className="h-64 flex items-center justify-center">
                   <div style={{ width: "300px", height: "300px" }}>
