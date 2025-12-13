@@ -3,24 +3,13 @@ import { collection, query, orderBy, getDocs } from "firebase/firestore";
 import { CHAT_CONFIG } from "../config/chatConfig";
 import type { Sale } from "../types/Sale";
 import type { CartItem } from "../types/Product";
-
-interface ChatRequest {
-  question: string;
-  today: string;
-}
-
-interface ChatResponse {
-  content: string;
-  timestamp?: string;
-  status?: string;
-}
+import type { ChatRequest, ChatResponse } from "../types/services";
 
 class ChatService {
   private webhookUrl: string;
   constructor(config: typeof CHAT_CONFIG) {
     this.webhookUrl = config.WEBHOOK_URL;
   }
-
   /**
    * Firebase'den satış verilerini çeker
    */
@@ -80,9 +69,7 @@ class ChatService {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
       };
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-      console.log(apiKey);
-      if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`; // only if provided
+
 
       const response: Response = await fetch(this.webhookUrl, {
         method: "POST",
@@ -96,7 +83,7 @@ class ChatService {
         try {
           const text = await response.text();
           details = text?.slice(0, 500);
-        } catch {}
+        } catch { }
         throw new Error(
           `HTTP ${response.status} ${response.statusText}${details ? `: ${details}` : ""}`
         );
