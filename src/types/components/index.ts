@@ -20,3 +20,15 @@ export type ProductTableSettingsPageProps = {
     onUpdate: (id: string, field: keyof CartItem, value: string | number) => void;
     onDelete: (id: string) => void;
 };
+
+export interface ConfirmationModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    title: string;
+    message: string;
+    type?: "danger" | "info" | "warning";
+    confirmText?: string;
+    cancelText?: string;
+}
+

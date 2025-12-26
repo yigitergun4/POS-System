@@ -7,6 +7,7 @@ import SettingsPage from "./pages/SettingsPage";
 import Layout from "./components/Layout";
 import { ToastContainer } from "react-toastify";
 import { useAuth } from "./contexts/AuthContext";
+import { ConfirmationProvider } from "./contexts/ConfirmationContext";
 
 function ProtectedRoute() {
   const { user, loading } = useAuth();
@@ -26,16 +27,18 @@ export default function App() {
   return (
     <BrowserRouter basename="/POS-System">
       <ToastContainer />
-      <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route element={<ProtectedRoute />}>
-          <Route path="/sales" element={<SalesPage />} />
-          <Route path="/stock" element={<StockPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Route>
-      </Routes>
+      <ConfirmationProvider>
+        <Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/sales" element={<SalesPage />} />
+            <Route path="/stock" element={<StockPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Route>
+        </Routes>
+      </ConfirmationProvider>
     </BrowserRouter>
   );
 }

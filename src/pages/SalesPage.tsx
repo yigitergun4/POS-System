@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
 import SalesPageTotalSide from "../components/SalesPageTotalSide";
 import useBarcodeScanner from "../hooks/useBarcodeScanner";
@@ -45,7 +46,7 @@ export default function SalesPage() {
     paymentMethod: "cash" | "card" | "family"
   ) => Promise<void> = async (paymentMethod: "cash" | "card" | "family") => {
     if (cart.length === 0) {
-      alert("Sepet boş!");
+      toast.warning("Sepet boş!");
       return;
     }
 
@@ -66,10 +67,10 @@ export default function SalesPage() {
       }
 
       handleClearCart();
-      alert("Satış başarıyla gerçekleştirildi ✅");
+      toast.success("Satış başarıyla gerçekleştirildi ✅");
     } catch (err) {
       console.error("Satış kaydedilemedi:", err);
-      alert("Satış gerçekleştirilirken hata oluştu ❌");
+      toast.error("Satış gerçekleştirilirken hata oluştu ❌");
     }
   };
 

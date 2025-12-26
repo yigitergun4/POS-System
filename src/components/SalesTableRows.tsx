@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 import type { Sale } from "../types/Sale";
 import { useAuth } from "../contexts/AuthContext";
+import { useConfirmation } from "../contexts/ConfirmationContext";
 import { deleteDoc, doc, runTransaction } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { toast } from "react-toastify";
@@ -54,6 +55,7 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
   const [paymentMethodFilter, setPaymentMethodFilter] =
     useState<PaymentMethodFilter>("all");
   const { user } = useAuth();
+  const { confirm } = useConfirmation();
 
   // Reset filters and page when filteredSales changes (date range changes)
   useEffect(() => {
@@ -173,7 +175,17 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
   };
 
   const deleteSale: (sale: Sale) => Promise<void> = async (sale) => {
-    await handleDelete(sale);
+    const isConfirmed = await confirm({
+      title: "Satışı Sil",
+      message: "Bu satışı silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve stoklar geri yüklenecektir.",
+      type: "danger",
+      confirmText: "Evet, Sil",
+      cancelText: "Vazgeç"
+    });
+
+    if (isConfirmed) {
+      await handleDelete(sale);
+    }
   };
 
   const hasActiveFilters: boolean =
@@ -412,15 +424,7 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
                       <td className="px-4 py-3 text-center">
                         <button
                           className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white text-xs font-medium rounded-lg hover:bg-red-600 transition-colors shadow-sm"
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                "Satışı silmek istediğinize emin misiniz?"
-                              )
-                            ) {
-                              deleteSale(sale);
-                            }
-                          }}
+                          onClick={() => deleteSale(sale)}
                         >
                           🗑️ Sil
                         </button>
