@@ -50,7 +50,7 @@ export default function AddProductModalSettingsPage({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-sm text-gray-600 mb-1">
-              💰 Fiyat (₺)
+              💰 Satış Fiyatı (₺)
             </label>
             <input
               type="number"
@@ -70,6 +70,28 @@ export default function AddProductModalSettingsPage({
           </div>
           <div>
             <label className="block text-sm text-gray-600 mb-1">
+              🏷️ Alış Fiyatı (₺)
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              className="border rounded-lg px-2 py-2 w-full text-right"
+              value={newProduct.cost ?? 0}
+              onInput={(e) => {
+                const rawValue: string = (e.target as HTMLInputElement).value;
+                const cleaned: string = rawValue.replace(/[^0-9.,]/g, "");
+                const normalized: string = cleaned.replace(",", ".");
+                setNewProduct({
+                  ...newProduct,
+                  cost: parseFloat(normalized) || 0,
+                });
+              }}
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">
               📦 Stok Adedi
             </label>
             <input
@@ -86,24 +108,35 @@ export default function AddProductModalSettingsPage({
               }}
             />
           </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">
+              Kritik Eşik
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              className="border rounded-lg px-2 py-2 w-full text-right"
+              value={newProduct.threshold ?? 0}
+              onInput={(e) => {
+                const value = (e.target as HTMLInputElement).value.replace(
+                  /\D/g,
+                  ""
+                );
+                setNewProduct({ ...newProduct, threshold: Number(value) || 0 });
+              }}
+            />
+          </div>
         </div>
         <div>
-          <label className="block text-sm text-gray-600 mb-1">
-            Kritik Eşik
-          </label>
+          <label className="block text-sm text-gray-600 mb-1">🏪 Toptancı</label>
           <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            className="border rounded-lg px-2 py-2 w-full text-right"
-            value={newProduct.threshold ?? 0}
-            onInput={(e) => {
-              const value = (e.target as HTMLInputElement).value.replace(
-                /\D/g,
-                ""
-              );
-              setNewProduct({ ...newProduct, threshold: Number(value) || 0 });
-            }}
+            placeholder="Örn: Metro, BİM Toptancı"
+            className="border rounded-lg px-2 py-2 w-full"
+            value={newProduct.supplier ?? ""}
+            onChange={(e) =>
+              setNewProduct({ ...newProduct, supplier: e.target.value })
+            }
           />
         </div>
         <div>

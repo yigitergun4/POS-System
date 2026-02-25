@@ -33,6 +33,8 @@ export default function ProductRowSettingsPage({
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editName, setEditName] = useState<string>(product.name);
   const [editPrice, setEditPrice] = useState<number>(product.price);
+  const [editCost, setEditCost] = useState<number>(product.cost ?? 0);
+  const [editSupplier, setEditSupplier] = useState<string>(product.supplier ?? "");
   const [editQty, setEditQty] = useState<number>(product.qty);
   const [editCategory, setEditCategory] = useState<string>(product.category);
   const [editThreshold, setEditThreshold] = useState<number>(
@@ -53,6 +55,8 @@ export default function ProductRowSettingsPage({
   const handleSave: () => void = () => {
     onUpdate(product.barcode, "name", editName);
     onUpdate(product.barcode, "price", editPrice);
+    onUpdate(product.barcode, "cost", editCost);
+    onUpdate(product.barcode, "supplier", editSupplier);
     onUpdate(product.barcode, "qty", editQty);
     onUpdate(product.barcode, "category", editCategory);
     onUpdate(product.barcode, "threshold", editThreshold);
@@ -84,6 +88,29 @@ export default function ProductRowSettingsPage({
           />
         ) : (
           <span>{product.price} ₺</span>
+        )}
+      </td>
+      <td className="border px-3 py-2 text-center">
+        {isEditing ? (
+          <input
+            type="number"
+            className="w-20 border rounded px-2 py-1 text-right"
+            value={editCost}
+            onChange={(e) => setEditCost(Number(e.target.value))}
+          />
+        ) : (
+          <span>{product.cost ?? 0} ₺</span>
+        )}
+      </td>
+      <td className="border px-3 py-2 text-center">
+        {isEditing ? (
+          <input
+            className="w-24 border rounded px-2 py-1"
+            value={editSupplier}
+            onChange={(e) => setEditSupplier(e.target.value)}
+          />
+        ) : (
+          <span className="text-gray-600">{product.supplier || "-"}</span>
         )}
       </td>
       <td className="border px-3 py-2 text-center">

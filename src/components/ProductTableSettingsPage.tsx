@@ -47,7 +47,9 @@ export default function ProductTableSettingsPage({
           <tr>
             <th className="border px-3 py-2 text-left">Ürün Adı</th>
             <th className="border px-3 py-2 text-left">Barkod</th>
-            <th className="border px-3 py-2 text-center">Fiyat</th>
+            <th className="border px-3 py-2 text-center">Satış Fiyatı</th>
+            <th className="border px-3 py-2 text-center">Alış Fiyatı</th>
+            <th className="border px-3 py-2 text-center">Toptancı</th>
             <th className="border px-3 py-2 text-center">Stok</th>
             <th className="border px-3 py-2 text-center">Kritik Eşik</th>
             <th className="border px-3 py-2 text-center">Kategori</th>

@@ -14,6 +14,7 @@ import { db } from "../lib/firebase";
 import type { CartItem } from "../types/Product";
 import ProductTableSettingsPage from "../components/ProductTableSettingsPage";
 import AddProductModalSettingsPage from "../components/AddProductModalSettingsPage";
+import BulkPriceModal from "../components/BulkPriceModal";
 import { toast } from "react-toastify";
 
 type ActiveTab = "general" | "products";
@@ -23,10 +24,13 @@ export default function SettingsPage() {
   const [productList, setProductList] = useState<CartItem[]>([]);
   const [filterText, setFilterText] = useState<string>("");
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
+  const [showBulkPriceModal, setShowBulkPriceModal] = useState<boolean>(false);
   const [newProduct, setNewProduct] = useState<CartItem>({
     id: "",
     name: "",
     price: 0,
+    cost: 0,
+    supplier: "",
     qty: 0,
     barcode: "",
     category: "Diğer",
@@ -93,6 +97,8 @@ export default function SettingsPage() {
       id: "",
       name: "",
       price: 0,
+      cost: 0,
+      supplier: "",
       qty: 0,
       barcode: "",
       category: "Diğer",
@@ -116,8 +122,8 @@ export default function SettingsPage() {
     field: keyof CartItem,
     value: string | number
   ) => {
-    await updateDoc(doc(db, "products", id), { [field]: value });
-  };
+      await updateDoc(doc(db, "products", id), { [field]: value });
+    };
 
   const saveCurrency: () => Promise<void> = async () => {
     const generalRef = doc(db, "settings", "general");
@@ -131,17 +137,15 @@ export default function SettingsPage() {
       <div className="flex space-x-4 p-6 border-b bg-white">
         <button
           onClick={() => setActiveTab("general")}
-          className={`px-4 py-2 rounded-lg ${
-            activeTab === "general" ? "bg-blue-500 text-white" : "bg-gray-100"
-          }`}
+          className={`px-4 py-2 rounded-lg ${activeTab === "general" ? "bg-blue-500 text-white" : "bg-gray-100"
+            }`}
         >
           ⚙️ Genel Ayarlar
         </button>
         <button
           onClick={() => setActiveTab("products")}
-          className={`px-4 py-2 rounded-lg ${
-            activeTab === "products" ? "bg-blue-500 text-white" : "bg-gray-100"
-          }`}
+          className={`px-4 py-2 rounded-lg ${activeTab === "products" ? "bg-blue-500 text-white" : "bg-gray-100"
+            }`}
         >
           🛒 Ürün Yönetimi
         </button>
@@ -176,12 +180,20 @@ export default function SettingsPage() {
       {activeTab === "products" && (
         <div className="p-6 bg-white shadow-md rounded-xl border border-gray-200 max-h-[calc(100vh-12rem)] overflow-y-auto m-6">
           <div className="flex justify-between items-center mb-4">
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow"
-            >
-              ➕ Ürün Ekle
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow"
+              >
+                ➕ Ürün Ekle
+              </button>
+              <button
+                onClick={() => setShowBulkPriceModal(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow"
+              >
+                📊 Toplu Fiyat Güncelle
+              </button>
+            </div>
             <span className="text-sm text-gray-600">
               Toplam <span className="font-bold">{productList.length}</span>{" "}
               ürün
@@ -222,6 +234,13 @@ export default function SettingsPage() {
           setNewProduct={setNewProduct}
           onSave={handleAddProduct}
           onClose={handleCloseModal}
+        />
+      )}
+      {showBulkPriceModal && (
+        <BulkPriceModal
+          products={productList}
+          onClose={() => setShowBulkPriceModal(false)}
+          onDone={() => setShowBulkPriceModal(false)}
         />
       )}
     </div>

@@ -42,6 +42,7 @@ export default function DashboardPage() {
   );
   const [showChat, setShowChat] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("Tümü");
+  const [showProfitKPIs, setShowProfitKPIs] = useState<boolean>(false);
 
   const options: {
     key: "daily" | "weekly" | "monthly" | "custom";
@@ -329,6 +330,87 @@ export default function DashboardPage() {
       .slice(0, 10);
   }, [filteredSales, selectedCategory]);
 
+  // Profit/Loss Analysis
+  const profitLoss = useMemo(() => {
+    let totalRevenue: number = 0;
+    let totalCost: number = 0;
+
+    filteredSales.forEach((sale) => {
+      if (sale.paymentMethod === "family") return;
+      sale.items.forEach((item) => {
+        if (selectedCategory !== "Tümü" && item.category !== selectedCategory) return;
+        const revenue: number = (item.price || 0) * item.qty;
+        const cost: number = (item.cost || 0) * item.qty;
+        totalRevenue += revenue;
+        totalCost += cost;
+      });
+    });
+
+    const grossProfit: number = totalRevenue - totalCost;
+    const profitMargin: number = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+
+    return { totalRevenue, totalCost, grossProfit, profitMargin };
+  }, [filteredSales, selectedCategory]);
+
+  // Daily Profit Trend Data
+  const profitTrendData = useMemo(() => {
+    const dailyData: Map<number, { revenue: number; cost: number }> = new Map();
+
+    filteredSales.forEach((sale) => {
+      if (sale.paymentMethod === "family") return;
+      const d: Date = new Date(sale.timestamp.seconds * 1000);
+      const dayStart: Date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const key: number = dayStart.getTime();
+
+      const prev = dailyData.get(key) || { revenue: 0, cost: 0 };
+
+      sale.items.forEach((item) => {
+        if (selectedCategory !== "Tümü" && item.category !== selectedCategory) return;
+        prev.revenue += (item.price || 0) * item.qty;
+        prev.cost += (item.cost || 0) * item.qty;
+      });
+
+      dailyData.set(key, prev);
+    });
+
+    return Array.from(dailyData.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([ts, data]) => ({
+        date: ts,
+        revenue: data.revenue,
+        cost: data.cost,
+        profit: data.revenue - data.cost,
+      }));
+  }, [filteredSales, selectedCategory]);
+
+  // Category Profit Breakdown
+  const categoryProfitData = useMemo(() => {
+    const catData: Record<string, { revenue: number; cost: number; units: number }> = {};
+
+    filteredSales.forEach((sale) => {
+      if (sale.paymentMethod === "family") return;
+      sale.items.forEach((item) => {
+        const cat: string = item.category || "Diğer";
+        if (selectedCategory !== "Tümü" && cat !== selectedCategory) return;
+        if (!catData[cat]) catData[cat] = { revenue: 0, cost: 0, units: 0 };
+        catData[cat].revenue += (item.price || 0) * item.qty;
+        catData[cat].cost += (item.cost || 0) * item.qty;
+        catData[cat].units += item.qty;
+      });
+    });
+
+    return Object.entries(catData)
+      .map(([category, data]) => ({
+        category,
+        revenue: data.revenue,
+        cost: data.cost,
+        profit: data.revenue - data.cost,
+        margin: data.revenue > 0 ? ((data.revenue - data.cost) / data.revenue) * 100 : 0,
+        units: data.units,
+      }))
+      .sort((a, b) => b.profit - a.profit);
+  }, [filteredSales, selectedCategory]);
+
   const paymentData: {
     labels: string[];
     datasets: { data: number[]; backgroundColor: string[] }[];
@@ -484,13 +566,67 @@ export default function DashboardPage() {
             subtitle="İşlem başına"
           />
         </div>
+
+        {/* Profit/Loss KPI Toggle */}
+        <button
+          onClick={() => setShowProfitKPIs((prev: boolean) => !prev)}
+          className="mb-4 flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition-all text-sm font-medium text-gray-700"
+        >
+          <span>{showProfitKPIs ? "▼" : "▶"}</span>
+          <span>📊 Kâr / Zarar Analizi</span>
+        </button>
+        {showProfitKPIs && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-emerald-100 text-sm font-medium">Toplam Ciro</span>
+                <span className="text-2xl">💰</span>
+              </div>
+              <div className="text-2xl font-bold">
+                ₺{profitLoss.totalRevenue.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </div>
+              <div className="text-emerald-100 text-xs mt-1">Aile hariç satış geliri</div>
+            </div>
+            <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-red-100 text-sm font-medium">Toplam Maliyet</span>
+                <span className="text-2xl">📉</span>
+              </div>
+              <div className="text-2xl font-bold">
+                ₺{profitLoss.totalCost.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </div>
+              <div className="text-red-100 text-xs mt-1">Toplam alış maliyeti</div>
+            </div>
+            <div className={`bg-gradient-to-br ${profitLoss.grossProfit >= 0 ? "from-green-500 to-green-600" : "from-rose-600 to-rose-700"} rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-white/80 text-sm font-medium">Brüt Kâr</span>
+                <span className="text-2xl">{profitLoss.grossProfit >= 0 ? "📈" : "📉"}</span>
+              </div>
+              <div className="text-2xl font-bold">
+                ₺{profitLoss.grossProfit.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </div>
+              <div className="text-white/80 text-xs mt-1">Ciro - Maliyet</div>
+            </div>
+            <div className={`bg-gradient-to-br ${profitLoss.profitMargin >= 20 ? "from-teal-500 to-teal-600" : profitLoss.profitMargin >= 0 ? "from-amber-500 to-amber-600" : "from-rose-600 to-rose-700"} rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-white/80 text-sm font-medium">Kâr Marjı</span>
+                <span className="text-2xl">📊</span>
+              </div>
+              <div className="text-2xl font-bold">
+                %{profitLoss.profitMargin.toFixed(1)}
+              </div>
+              <div className="text-white/80 text-xs mt-1">{profitLoss.profitMargin >= 20 ? "İyi" : profitLoss.profitMargin >= 0 ? "Düşük" : "Zarar"}</div>
+            </div>
+          </div>
+        )}
+
         {/* Tab Buttons */}
         <div className="flex gap-2 p-1 bg-gray-100 rounded-xl w-fit mb-6 w-full">
           <button
             onClick={() => setActiveReportTab("charts")}
             className={`px-6 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${activeReportTab === "charts"
-                ? "bg-white text-gray-900 shadow-md"
-                : "text-gray-600 hover:text-gray-900"
+              ? "bg-white text-gray-900 shadow-md"
+              : "text-gray-600 hover:text-gray-900"
               }`}
           >
             📊 Grafikler
@@ -498,8 +634,8 @@ export default function DashboardPage() {
           <button
             onClick={() => setActiveReportTab("list")}
             className={`px-6 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${activeReportTab === "list"
-                ? "bg-white text-gray-900 shadow-md"
-                : "text-gray-600 hover:text-gray-900"
+              ? "bg-white text-gray-900 shadow-md"
+              : "text-gray-600 hover:text-gray-900"
               }`}
           >
             📋 Satış Listesi
@@ -507,6 +643,102 @@ export default function DashboardPage() {
         </div>
         {activeReportTab === "charts" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            {/* Profit Trend Chart */}
+            {range !== "daily" && profitTrendData.length > 0 && (
+              <div className="col-span-1 lg:col-span-2">
+                <ChartCard title="Kâr/Zarar Trend" icon="📊" subtitle={selectedCategory === "Tümü" ? "Günlük gelir, maliyet ve kâr" : `${selectedCategory} - Kâr/Zarar`}>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={profitTrendData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis
+                          dataKey="date"
+                          type="number"
+                          scale="time"
+                          domain={["dataMin", "dataMax"]}
+                          tickFormatter={(ts) => format(new Date(ts), "dd/MM")}
+                          interval="preserveStartEnd"
+                          minTickGap={10}
+                        />
+                        <YAxis
+                          tickFormatter={(value) =>
+                            `₺${value.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                          }
+                        />
+                        <RechartsTooltip
+                          labelFormatter={(ts) => format(new Date(ts), "dd/MM/yyyy")}
+                          formatter={(value: number, name: string) => [
+                            `₺${value.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}`,
+                            name === "revenue" ? "Ciro" : name === "cost" ? "Maliyet" : "Kâr",
+                          ]}
+                        />
+                        <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} dot={true} name="revenue" />
+                        <Line type="monotone" dataKey="cost" stroke="#ef4444" strokeWidth={2} dot={true} name="cost" />
+                        <Line type="monotone" dataKey="profit" stroke="#3b82f6" strokeWidth={2.5} dot={true} name="profit" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </ChartCard>
+              </div>
+            )}
+
+            {/* Category Profit Table */}
+            <div className="col-span-1 lg:col-span-2">
+              <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+                <div className="p-6 border-b border-gray-100">
+                  <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    🏷️ Kategori Bazlı Kâr Analizi
+                  </h2>
+                </div>
+                <div className="overflow-x-auto">
+                  {categoryProfitData.length > 0 ? (
+                    <table className="min-w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Kategori</th>
+                          <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Ciro</th>
+                          <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Maliyet</th>
+                          <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Kâr</th>
+                          <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Marj</th>
+                          <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Adet</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {categoryProfitData.map((cat) => (
+                          <tr key={cat.category} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-6 py-3 font-medium text-gray-900">{cat.category}</td>
+                            <td className="px-6 py-3 text-right text-gray-700">
+                              ₺{cat.revenue.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-6 py-3 text-right text-gray-700">
+                              ₺{cat.cost.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className={`px-6 py-3 text-right font-bold ${cat.profit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                              ₺{cat.profit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-6 py-3 text-center">
+                              <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${cat.margin >= 20 ? "bg-green-100 text-green-700" :
+                                cat.margin >= 0 ? "bg-amber-100 text-amber-700" :
+                                  "bg-red-100 text-red-700"
+                                }`}>
+                                %{cat.margin.toFixed(1)}
+                              </span>
+                            </td>
+                            <td className="px-6 py-3 text-center text-gray-700">{cat.units.toLocaleString("tr-TR")}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="text-center py-10 text-gray-500">
+                      Seçilen aralıkta satış verisi yok
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {range !== "daily" ? (
               <div className="col-span-1 lg:col-span-2">
                 <ChartCard title="Satış Trendleri" icon="📈" subtitle={selectedCategory === "Tümü" ? "Günlük satış grafiği" : `${selectedCategory} - Günlük`}>
@@ -775,12 +1007,12 @@ export default function DashboardPage() {
                           <div className="flex items-center gap-4 z-10">
                             <div
                               className={`w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm ${index === 0
-                                  ? "bg-yellow-400 text-yellow-900"
-                                  : index === 1
-                                    ? "bg-gray-300 text-gray-800"
-                                    : index === 2
-                                      ? "bg-orange-300 text-orange-900"
-                                      : "bg-blue-100 text-blue-600"
+                                ? "bg-yellow-400 text-yellow-900"
+                                : index === 1
+                                  ? "bg-gray-300 text-gray-800"
+                                  : index === 2
+                                    ? "bg-orange-300 text-orange-900"
+                                    : "bg-blue-100 text-blue-600"
                                 }`}
                             >
                               {index + 1}

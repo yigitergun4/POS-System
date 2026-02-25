@@ -38,4 +38,11 @@ export interface SplitPaymentModalProps {
     onClose: () => void;
 }
 
+export interface BulkPriceModalProps {
+    products: CartItem[];
+    onClose: () => void;
+    onDone: () => void;
+}
+
+
 
