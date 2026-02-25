@@ -2,7 +2,8 @@ export type Sale = {
   id: string;
   timestamp: { seconds: number; nanoseconds: number };
   total: number;
-  paymentMethod: "cash" | "card" | "family";
+  paymentMethod: "cash" | "card" | "family" | "split";
+  splitDetails?: { cashAmount: number; cardAmount: number };
   items: {
     name: string;
     category?: string;

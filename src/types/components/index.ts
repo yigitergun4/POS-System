@@ -32,3 +32,10 @@ export interface ConfirmationModalProps {
     cancelText?: string;
 }
 
+export interface SplitPaymentModalProps {
+    total: number;
+    onConfirm: (cashAmount: number, cardAmount: number) => void;
+    onClose: () => void;
+}
+
+

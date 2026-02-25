@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
 import SalesPageTotalSide from "../components/SalesPageTotalSide";
+import SplitPaymentModal from "../components/SplitPaymentModal";
 import useBarcodeScanner from "../hooks/useBarcodeScanner";
 import QuantityInput from "../components/QuantityInput";
 import CartItemControls from "../components/CardItemsControls";
@@ -25,6 +26,7 @@ export default function SalesPage() {
   const [qty, setQty] = useState<number>(1);
   const [lastProduct, setLastProduct] = useState<CartItem | null>(null);
   const [tab, setTab] = useState<"barcode" | "manual">("barcode");
+  const [showSplitModal, setShowSplitModal] = useState<boolean>(false);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "products"), (snapshot) => {
@@ -43,36 +45,41 @@ export default function SalesPage() {
     setQty(1);
   };
   const completeSale: (
-    paymentMethod: "cash" | "card" | "family"
-  ) => Promise<void> = async (paymentMethod: "cash" | "card" | "family") => {
-    if (cart.length === 0) {
-      toast.warning("Sepet boş!");
-      return;
-    }
-
-    try {
-      const todayId: string = format(new Date(), "yyyy-MM-dd");
-      await addDoc(collection(db, "sales"), {
-        timestamp: serverTimestamp(),
-        saleDay: todayId,
-        items: cart,
-        total,
-        paymentMethod,
-      });
-      for (const product of cart) {
-        const productRef = doc(db, "products", product.barcode);
-        await updateDoc(productRef, {
-          qty: increment(-product.qty),
-        });
+    paymentMethod: "cash" | "card" | "family" | "split",
+    splitDetails?: { cashAmount: number; cardAmount: number }
+  ) => Promise<void> = async (
+    paymentMethod: "cash" | "card" | "family" | "split",
+    splitDetails?: { cashAmount: number; cardAmount: number }
+  ) => {
+      if (cart.length === 0) {
+        toast.warning("Sepet boş!");
+        return;
       }
 
-      handleClearCart();
-      toast.success("Satış başarıyla gerçekleştirildi ✅");
-    } catch (err) {
-      console.error("Satış kaydedilemedi:", err);
-      toast.error("Satış gerçekleştirilirken hata oluştu ❌");
-    }
-  };
+      try {
+        const todayId: string = format(new Date(), "yyyy-MM-dd");
+        await addDoc(collection(db, "sales"), {
+          timestamp: serverTimestamp(),
+          saleDay: todayId,
+          items: cart,
+          total,
+          paymentMethod,
+          ...(splitDetails ? { splitDetails } : {}),
+        });
+        for (const product of cart) {
+          const productRef = doc(db, "products", product.barcode);
+          await updateDoc(productRef, {
+            qty: increment(-product.qty),
+          });
+        }
+
+        handleClearCart();
+        toast.success("Satış başarıyla gerçekleştirildi ✅");
+      } catch (err) {
+        console.error("Satış kaydedilemedi:", err);
+        toast.error("Satış gerçekleştirilirken hata oluştu ❌");
+      }
+    };
 
   const handleCashPayment: () => Promise<void> = async () =>
     completeSale("cash");
@@ -80,6 +87,22 @@ export default function SalesPage() {
     completeSale("card");
   const handleFamilyPayment: () => Promise<void> = async () =>
     completeSale("family");
+
+  const handleSplitPayment: () => void = () => {
+    if (cart.length === 0) {
+      toast.warning("Sepet boş!");
+      return;
+    }
+    setShowSplitModal(true);
+  };
+
+  const handleSplitConfirm: (cashAmount: number, cardAmount: number) => Promise<void> = async (
+    cashAmount: number,
+    cardAmount: number
+  ) => {
+    setShowSplitModal(false);
+    await completeSale("split", { cashAmount, cardAmount });
+  };
 
   useBarcodeScanner((code: string) => {
     if (tab !== "barcode") return;
@@ -137,21 +160,19 @@ export default function SalesPage() {
           <div className="flex gap-2 mb-4">
             <button
               onClick={() => setTab("barcode")}
-              className={`px-4 py-2 rounded-lg font-medium ${
-                tab === "barcode"
+              className={`px-4 py-2 rounded-lg font-medium ${tab === "barcode"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-200 text-gray-700"
-              }`}
+                }`}
             >
               Barkod
             </button>
             <button
               onClick={() => setTab("manual")}
-              className={`px-4 py-2 rounded-lg font-medium ${
-                tab === "manual"
+              className={`px-4 py-2 rounded-lg font-medium ${tab === "manual"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-200 text-gray-700"
-              }`}
+                }`}
             >
               Ürün Seç
             </button>
@@ -270,8 +291,16 @@ export default function SalesPage() {
           onCardPayment={handleCardPayment}
           onClearCart={handleClearCart}
           onFamilyPayment={handleFamilyPayment}
+          onSplitPayment={handleSplitPayment}
         />
       </div>
+      {showSplitModal && (
+        <SplitPaymentModal
+          total={total}
+          onConfirm={handleSplitConfirm}
+          onClose={() => setShowSplitModal(false)}
+        />
+      )}
     </div>
   );
 }

@@ -9,10 +9,10 @@ import { toast } from "react-toastify";
 import Pagination from "./Pagination";
 import { DEFAULT_PAGE_SIZE, type PageSizeOption } from "../config";
 
-type PaymentMethodFilter = "all" | "cash" | "card" | "family";
+type PaymentMethodFilter = "all" | "cash" | "card" | "family" | "split";
 
 const PAYMENT_METHOD_CONFIG: Record<
-  "cash" | "card" | "family",
+  "cash" | "card" | "family" | "split",
   { label: string; bgColor: string; textColor: string; icon: string }
 > = {
   cash: {
@@ -33,6 +33,12 @@ const PAYMENT_METHOD_CONFIG: Record<
     textColor: "text-purple-800",
     icon: "👨‍👩‍👧",
   },
+  split: {
+    label: "Bölüşümlü",
+    bgColor: "bg-amber-100",
+    textColor: "text-amber-800",
+    icon: "✂️",
+  },
 };
 
 const PAYMENT_FILTER_LABELS: Record<PaymentMethodFilter, string> = {
@@ -40,9 +46,11 @@ const PAYMENT_FILTER_LABELS: Record<PaymentMethodFilter, string> = {
   cash: "💵 Nakit",
   card: "💳 Kart",
   family: "👨‍👩‍👧 Aile",
+  split: "✂️ Bölüşümlü",
 };
 
 function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<"date" | "total" | "qty" | null>(
     "date"
   );
@@ -193,7 +201,7 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
 
   // Get row background color based on payment method
   const getRowStyles = (
-    paymentMethod: "cash" | "card" | "family",
+    paymentMethod: "cash" | "card" | "family" | "split",
     index: number
   ): string => {
     const isEven: boolean = index % 2 === 0;
@@ -204,9 +212,22 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
       cash: "border-l-4 border-l-green-400",
       card: "border-l-4 border-l-blue-400",
       family: "border-l-4 border-l-purple-400",
+      split: "border-l-4 border-l-amber-400",
     };
 
     return `${baseStripe} ${borderColors[paymentMethod]} hover:bg-gray-100 transition-colors`;
+  };
+
+  const toggleRowExpanded: (saleId: string) => void = (saleId: string) => {
+    setExpandedRows((prev: Set<string>) => {
+      const newSet: Set<string> = new Set(prev);
+      if (newSet.has(saleId)) {
+        newSet.delete(saleId);
+      } else {
+        newSet.add(saleId);
+      }
+      return newSet;
+    });
   };
 
   return (
@@ -272,17 +293,16 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
               <button
                 key={key}
                 onClick={() => setPaymentMethodFilter(key)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                  paymentMethodFilter === key
-                    ? key === "all"
-                      ? "bg-gray-700 text-white shadow"
-                      : key === "cash"
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${paymentMethodFilter === key
+                  ? key === "all"
+                    ? "bg-gray-700 text-white shadow"
+                    : key === "cash"
                       ? "bg-green-500 text-white shadow"
                       : key === "card"
-                      ? "bg-blue-500 text-white shadow"
-                      : "bg-purple-500 text-white shadow"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
+                        ? "bg-blue-500 text-white shadow"
+                        : "bg-purple-500 text-white shadow"
+                  : "text-gray-600 hover:bg-gray-100"
+                  }`}
               >
                 {PAYMENT_FILTER_LABELS[key]}
               </button>
@@ -389,6 +409,16 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
                       >
                         {paymentConfig.icon} {paymentConfig.label}
                       </span>
+                      {sale.paymentMethod === "split" && sale.splitDetails && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          <span className="inline-flex items-center gap-0.5 text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-md whitespace-nowrap">
+                            💵 ₺{sale.splitDetails.cashAmount.toLocaleString("tr-TR")}
+                          </span>
+                          <span className="inline-flex items-center gap-0.5 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md whitespace-nowrap">
+                            💳 ₺{sale.splitDetails.cardAmount.toLocaleString("tr-TR")}
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="text-lg font-bold text-gray-900">
@@ -401,8 +431,8 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {sale.items.slice(0, 3).map((item, i) => (
+                      <div className="flex flex-wrap gap-1 items-center">
+                        {(expandedRows.has(sale.id) ? sale.items : sale.items.slice(0, 3)).map((item, i) => (
                           <span
                             key={i}
                             className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 text-xs"
@@ -414,9 +444,14 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
                           </span>
                         ))}
                         {sale.items.length > 3 && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-200 text-gray-600 text-xs font-medium">
-                            +{sale.items.length - 3} daha
-                          </span>
+                          <button
+                            onClick={() => toggleRowExpanded(sale.id)}
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100 text-xs font-medium cursor-pointer transition-colors"
+                          >
+                            {expandedRows.has(sale.id)
+                              ? "Gizle"
+                              : `+${sale.items.length - 3} daha`}
+                          </button>
                         )}
                       </div>
                     </td>

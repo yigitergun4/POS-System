@@ -1,7 +1,7 @@
 interface PaymentButtonProps {
   label: string;
   icon?: string;
-  color: "green" | "blue" | "red" | "gray";
+  color: "green" | "blue" | "red" | "gray" | "amber";
   onClick?: () => void;
   disabled?: boolean;
 }
@@ -10,7 +10,7 @@ export default function PaymentButton({
   label,
   icon,
   color,
-  onClick = () => {},
+  onClick = () => { },
   disabled = false,
 }: PaymentButtonProps) {
   const colorClasses: string =
@@ -20,7 +20,9 @@ export default function PaymentButton({
         ? "bg-blue-600 hover:bg-blue-700"
         : color === "red"
           ? "bg-red-600 hover:bg-red-700"
-          : "bg-gray-600 hover:bg-gray-700";
+          : color === "amber"
+            ? "bg-amber-500 hover:bg-amber-600"
+            : "bg-gray-600 hover:bg-gray-700";
 
   return (
     <button

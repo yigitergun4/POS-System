@@ -30,11 +30,10 @@ export default function ProductGrid({ products, onSelect }: ProductGridProps) {
           <button
             key={cat}
             onClick={() => setActiveCategory(cat)}
-            className={`px-3 py-2 rounded-lg whitespace-nowrap text-sm font-medium ${
-              activeCategory === cat
+            className={`px-3 py-2 rounded-lg whitespace-nowrap text-sm font-medium ${activeCategory === cat
                 ? "bg-blue-600 text-white"
                 : "bg-gray-200 text-gray-700"
-            }`}
+              }`}
           >
             {cat}
           </button>

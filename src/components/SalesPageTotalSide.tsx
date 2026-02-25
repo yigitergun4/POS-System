@@ -7,6 +7,7 @@ interface SalesPageTotalSideProps {
   onCardPayment?: () => Promise<void>;
   onClearCart?: () => void;
   onFamilyPayment?: () => void;
+  onSplitPayment?: () => void;
 }
 
 export default function SalesPageTotalSide({
@@ -15,6 +16,7 @@ export default function SalesPageTotalSide({
   onCardPayment,
   onClearCart,
   onFamilyPayment,
+  onSplitPayment,
 }: SalesPageTotalSideProps) {
   return (
     <div className="w-1/4 bg-gray-50 border-l border-gray-200 flex flex-col p-6">
@@ -39,6 +41,12 @@ export default function SalesPageTotalSide({
           onClick={onFamilyPayment}
           disabled={total === 0}
         />
+        <PaymentButton
+          label="✂️ Bölüşümlü Ödeme"
+          color="amber"
+          onClick={onSplitPayment}
+          disabled={total === 0}
+        />
       </div>
       <div className="mt-auto space-y-3">
         <PaymentButton
@@ -53,3 +61,4 @@ export default function SalesPageTotalSide({
     </div>
   );
 }
+
