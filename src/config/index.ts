@@ -4,3 +4,4 @@ export {
     PAGE_SIZE_OPTIONS,
     type PageSizeOption,
 } from "./paginationConfig";
+export { DEFAULT_SUPPLIERS } from "./supplierConfig";

@@ -7,6 +7,7 @@ import {
   deleteDoc,
   updateDoc,
   getDoc,
+  getDocs,
   onSnapshot,
   type DocumentReference,
 } from "firebase/firestore";
@@ -16,10 +17,13 @@ import ProductTableSettingsPage from "../components/ProductTableSettingsPage";
 import AddProductModalSettingsPage from "../components/AddProductModalSettingsPage";
 import BulkPriceModal from "../components/BulkPriceModal";
 import { toast } from "react-toastify";
+import { useConfirmation } from "../contexts/ConfirmationContext";
+import { DEFAULT_SUPPLIERS } from "../config";
 
-type ActiveTab = "general" | "products";
+type ActiveTab = "general" | "products" | "suppliers";
 
 export default function SettingsPage() {
+  const { confirm } = useConfirmation();
   const [activeTab, setActiveTab] = useState<ActiveTab>("general");
   const [productList, setProductList] = useState<CartItem[]>([]);
   const [filterText, setFilterText] = useState<string>("");
@@ -39,6 +43,11 @@ export default function SettingsPage() {
   const [currency, setCurrency] = useState<string>("TL");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  // Supplier management
+  const [suppliers, setSuppliers] = useState<string[]>([]);
+  const [newSupplier, setNewSupplier] = useState<string>("");
+
+  // Load products
   useEffect(() => {
     const unsubscribe: () => void = onSnapshot(
       collection(db, "products"),
@@ -49,6 +58,27 @@ export default function SettingsPage() {
         setProductList(data);
       }
     );
+    return () => unsubscribe();
+  }, []);
+
+  // Load suppliers (seed defaults if empty)
+  useEffect(() => {
+    const initSuppliers = async () => {
+      const suppliersSnap = await getDocs(collection(db, "suppliers"));
+      if (suppliersSnap.empty) {
+        for (const name of DEFAULT_SUPPLIERS) {
+          await setDoc(doc(db, "suppliers", name), { name });
+        }
+      }
+    };
+    initSuppliers();
+
+    const unsubscribe = onSnapshot(collection(db, "suppliers"), (snapshot) => {
+      const data: string[] = snapshot.docs
+        .map((d) => (d.data() as { name: string }).name)
+        .sort((a, b) => a.localeCompare(b, "tr"));
+      setSuppliers(data);
+    });
     return () => unsubscribe();
   }, []);
 
@@ -131,6 +161,34 @@ export default function SettingsPage() {
     toast.success("Para birimi kaydedildi ✅");
   };
 
+  const handleAddSupplier = async () => {
+    const name = newSupplier.trim();
+    if (!name) {
+      toast.error("Toptancı adı boş olamaz!");
+      return;
+    }
+    if (suppliers.includes(name)) {
+      toast.error("Bu toptancı zaten mevcut!");
+      return;
+    }
+    await setDoc(doc(db, "suppliers", name), { name });
+    toast.success(`${name} eklendi ✅`);
+    setNewSupplier("");
+  };
+
+  const handleDeleteSupplier = async (name: string) => {
+    const ok = await confirm({
+      title: "Toptancı Sil",
+      message: `"${name}" toptancısını silmek istediğinize emin misiniz?`,
+      type: "danger",
+      confirmText: "Sil",
+      cancelText: "Vazgeç",
+    });
+    if (!ok) return;
+    await deleteDoc(doc(db, "suppliers", name));
+    toast.success(`${name} silindi 🗑️`);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar pageTitle="Ayarlar" />
@@ -149,7 +207,15 @@ export default function SettingsPage() {
         >
           🛒 Ürün Yönetimi
         </button>
+        <button
+          onClick={() => setActiveTab("suppliers")}
+          className={`px-4 py-2 rounded-lg ${activeTab === "suppliers" ? "bg-blue-500 text-white" : "bg-gray-100"
+            }`}
+        >
+          🏪 Toptancılar
+        </button>
       </div>
+
       {activeTab === "general" && (
         <div className="p-6 bg-white shadow-md rounded-xl border border-gray-200 m-6">
           <h2 className="text-lg font-semibold mb-4">
@@ -177,6 +243,7 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
       {activeTab === "products" && (
         <div className="p-6 bg-white shadow-md rounded-xl border border-gray-200 max-h-[calc(100vh-12rem)] overflow-y-auto m-6">
           <div className="flex justify-between items-center mb-4">
@@ -228,12 +295,56 @@ export default function SettingsPage() {
           />
         </div>
       )}
+
+      {activeTab === "suppliers" && (
+        <div className="p-6 bg-white shadow-md rounded-xl border border-gray-200 m-6">
+          <h2 className="text-lg font-semibold mb-4">🏪 Toptancı Yönetimi</h2>
+          <div className="flex gap-2 mb-6">
+            <input
+              type="text"
+              placeholder="Yeni toptancı adı..."
+              className="border rounded-lg px-3 py-2 text-sm flex-1"
+              value={newSupplier}
+              onChange={(e) => setNewSupplier(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAddSupplier()}
+            />
+            <button
+              onClick={handleAddSupplier}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow"
+            >
+              ➕ Ekle
+            </button>
+          </div>
+          <div className="text-sm text-gray-500 mb-3">
+            Toplam <span className="font-bold">{suppliers.length}</span> toptancı
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+            {suppliers.map((s) => (
+              <div
+                key={s}
+                className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 group hover:bg-gray-100 transition-colors"
+              >
+                <span className="text-sm font-medium text-gray-800 truncate">{s}</span>
+                <button
+                  onClick={() => handleDeleteSupplier(s)}
+                  className="text-red-400 hover:text-red-600 text-xs ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Sil"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {showAddModal && (
         <AddProductModalSettingsPage
           newProduct={newProduct}
           setNewProduct={setNewProduct}
           onSave={handleAddProduct}
           onClose={handleCloseModal}
+          suppliers={suppliers}
         />
       )}
       {showBulkPriceModal && (

@@ -6,6 +6,7 @@ type Props = {
   setNewProduct: (p: CartItem) => void;
   onSave: () => void;
   onClose: () => void;
+  suppliers?: string[];
 };
 
 export default function AddProductModalSettingsPage({
@@ -13,6 +14,7 @@ export default function AddProductModalSettingsPage({
   setNewProduct,
   onSave,
   onClose,
+  suppliers = [],
 }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -130,14 +132,18 @@ export default function AddProductModalSettingsPage({
         </div>
         <div>
           <label className="block text-sm text-gray-600 mb-1">🏪 Toptancı</label>
-          <input
-            placeholder="Örn: Metro, BİM Toptancı"
+          <select
             className="border rounded-lg px-2 py-2 w-full"
             value={newProduct.supplier ?? ""}
             onChange={(e) =>
               setNewProduct({ ...newProduct, supplier: e.target.value })
             }
-          />
+          >
+            <option value="">Seçiniz...</option>
+            {suppliers.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-sm text-gray-600 mb-1">Kategori</label>

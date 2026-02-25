@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { CartItem } from "../types/Product";
 import { toast } from "react-toastify";
 import { db } from "../lib/firebase";
-import { collection, getDocs, query } from "firebase/firestore";
+import { collection, getDocs, query, onSnapshot } from "firebase/firestore";
 
 type Props = {
   product: CartItem;
@@ -41,6 +41,7 @@ export default function ProductRowSettingsPage({
     product.threshold ?? 0
   );
   const [categories, setCategories] = useState<string[]>([]);
+  const [suppliersList, setSuppliersList] = useState<string[]>([]);
 
   useEffect(() => {
     if (isEditing) {
@@ -51,6 +52,16 @@ export default function ProductRowSettingsPage({
       });
     }
   }, [isEditing]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "suppliers"), (snapshot) => {
+      const data: string[] = snapshot.docs
+        .map((d) => (d.data() as { name: string }).name)
+        .sort((a, b) => a.localeCompare(b, "tr"));
+      setSuppliersList(data);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleSave: () => void = () => {
     onUpdate(product.barcode, "name", editName);
@@ -104,11 +115,16 @@ export default function ProductRowSettingsPage({
       </td>
       <td className="border px-3 py-2 text-center">
         {isEditing ? (
-          <input
-            className="w-24 border rounded px-2 py-1"
+          <select
+            className="w-28 border rounded px-2 py-1"
             value={editSupplier}
             onChange={(e) => setEditSupplier(e.target.value)}
-          />
+          >
+            <option value="">Seçiniz...</option>
+            {suppliersList.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
         ) : (
           <span className="text-gray-600">{product.supplier || "-"}</span>
         )}
