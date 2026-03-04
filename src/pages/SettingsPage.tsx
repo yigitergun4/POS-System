@@ -1,5 +1,5 @@
 import Navbar from "../components/Navbar";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   collection,
   doc,
@@ -15,7 +15,7 @@ import { db } from "../lib/firebase";
 import type { CartItem } from "../types/Product";
 import ProductTableSettingsPage from "../components/ProductTableSettingsPage";
 import AddProductModalSettingsPage from "../components/AddProductModalSettingsPage";
-import BulkPriceModal from "../components/BulkPriceModal";
+import SupplierPriceModal from "../components/SupplierPriceModal";
 import { toast } from "react-toastify";
 import { useConfirmation } from "../contexts/ConfirmationContext";
 import { DEFAULT_SUPPLIERS } from "../config";
@@ -28,7 +28,7 @@ export default function SettingsPage() {
   const [productList, setProductList] = useState<CartItem[]>([]);
   const [filterText, setFilterText] = useState<string>("");
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
-  const [showBulkPriceModal, setShowBulkPriceModal] = useState<boolean>(false);
+  const [showSupplierPriceModal, setShowSupplierPriceModal] = useState<boolean>(false);
   const [newProduct, setNewProduct] = useState<CartItem>({
     id: "",
     name: "",
@@ -46,6 +46,24 @@ export default function SettingsPage() {
   // Supplier management
   const [suppliers, setSuppliers] = useState<string[]>([]);
   const [newSupplier, setNewSupplier] = useState<string>("");
+  const [supplierSearch, setSupplierSearch] = useState<string>("");
+
+  // Product count per supplier
+  const supplierProductCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const p of productList) {
+      const s = p.supplier || "";
+      if (s) counts[s] = (counts[s] || 0) + 1;
+    }
+    return counts;
+  }, [productList]);
+
+  // Filtered suppliers for search
+  const filteredSuppliers = useMemo(() => {
+    if (!supplierSearch.trim()) return suppliers;
+    const q = supplierSearch.toLowerCase();
+    return suppliers.filter((s) => s.toLowerCase().includes(q));
+  }, [suppliers, supplierSearch]);
 
   // Load products
   useEffect(() => {
@@ -160,9 +178,8 @@ export default function SettingsPage() {
     await setDoc(generalRef, { currency });
     toast.success("Para birimi kaydedildi ✅");
   };
-
-  const handleAddSupplier = async () => {
-    const name = newSupplier.trim();
+  const handleAddSupplier: () => Promise<void> = async () => {
+    const name: string = newSupplier.trim();
     if (!name) {
       toast.error("Toptancı adı boş olamaz!");
       return;
@@ -176,10 +193,14 @@ export default function SettingsPage() {
     setNewSupplier("");
   };
 
-  const handleDeleteSupplier = async (name: string) => {
-    const ok = await confirm({
+  const handleDeleteSupplier: (name: string) => Promise<void> = async (name: string) => {
+    const productCount: number = supplierProductCounts[name] || 0;
+    const message: string = productCount > 0
+      ? `"${name}" toptancısını silmek istediğinize emin misiniz? Bu toptancıya ait ${productCount} ürün var.`
+      : `"${name}" toptancısını silmek istediğinize emin misiniz?`;
+    const ok: boolean = await confirm({
       title: "Toptancı Sil",
-      message: `"${name}" toptancısını silmek istediğinize emin misiniz?`,
+      message,
       type: "danger",
       confirmText: "Sil",
       cancelText: "Vazgeç",
@@ -188,6 +209,8 @@ export default function SettingsPage() {
     await deleteDoc(doc(db, "suppliers", name));
     toast.success(`${name} silindi 🗑️`);
   };
+
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -255,10 +278,10 @@ export default function SettingsPage() {
                 ➕ Ürün Ekle
               </button>
               <button
-                onClick={() => setShowBulkPriceModal(true)}
+                onClick={() => setShowSupplierPriceModal(true)}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow"
               >
-                📊 Toplu Fiyat Güncelle
+                📊 Toptancı Bazlı Zam
               </button>
             </div>
             <span className="text-sm text-gray-600">
@@ -297,43 +320,85 @@ export default function SettingsPage() {
       )}
 
       {activeTab === "suppliers" && (
-        <div className="p-6 bg-white shadow-md rounded-xl border border-gray-200 m-6">
-          <h2 className="text-lg font-semibold mb-4">🏪 Toptancı Yönetimi</h2>
-          <div className="flex gap-2 mb-6">
-            <input
-              type="text"
-              placeholder="Yeni toptancı adı..."
-              className="border rounded-lg px-3 py-2 text-sm flex-1"
-              value={newSupplier}
-              onChange={(e) => setNewSupplier(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddSupplier()}
-            />
-            <button
-              onClick={handleAddSupplier}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow"
-            >
-              ➕ Ekle
-            </button>
+        <div className="m-6 space-y-4">
+          {/* Header Card */}
+          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl px-6 py-5 shadow-lg">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              🏪 Toptancı Yönetimi
+            </h2>
+            <p className="text-indigo-200 text-sm mt-1">
+              Toplam <span className="font-bold text-white">{suppliers.length}</span> toptancı kayıtlı
+            </p>
           </div>
-          <div className="text-sm text-gray-500 mb-3">
-            Toplam <span className="font-bold">{suppliers.length}</span> toptancı
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-            {suppliers.map((s) => (
-              <div
-                key={s}
-                className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 group hover:bg-gray-100 transition-colors"
-              >
-                <span className="text-sm font-medium text-gray-800 truncate">{s}</span>
+
+          {/* Add + Search Row */}
+          <div className="bg-white shadow-md rounded-xl border border-gray-200 p-5">
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Add Supplier */}
+              <div className="flex gap-2 flex-1">
+                <input
+                  type="text"
+                  placeholder="Yeni toptancı adı..."
+                  className="border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm flex-1 focus:border-indigo-500 outline-none transition-all"
+                  value={newSupplier}
+                  onChange={(e) => setNewSupplier(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAddSupplier()}
+                />
                 <button
-                  onClick={() => handleDeleteSupplier(s)}
-                  className="text-red-400 hover:text-red-600 text-xs ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Sil"
+                  onClick={handleAddSupplier}
+                  className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md hover:shadow-lg active:scale-95 transition-all"
                 >
-                  ✕
+                  ➕ Ekle
                 </button>
               </div>
-            ))}
+              {/* Search */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Toptancı ara..."
+                  className="border-2 border-gray-200 rounded-xl px-4 py-2.5 pl-9 text-sm w-full sm:w-56 focus:border-indigo-500 outline-none transition-all"
+                  value={supplierSearch}
+                  onChange={(e) => setSupplierSearch(e.target.value)}
+                />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Supplier Grid */}
+          <div className="bg-white shadow-md rounded-xl border border-gray-200 p-5">
+            {filteredSuppliers.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <span className="text-3xl block mb-2">🔍</span>
+                <p className="text-sm">Toptancı bulunamadı</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {filteredSuppliers.map((s: string) => {
+                  const count: number = supplierProductCounts[s] || 0;
+                  return (
+                    <div
+                      key={s}
+                      className="group relative flex items-center justify-between bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 hover:bg-indigo-50 hover:border-indigo-300 transition-all"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-semibold text-gray-800 truncate block">{s}</span>
+                        <span className="text-xs text-gray-500">
+                          {count > 0 ? `${count} ürün` : "Ürün yok"}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteSupplier(s)}
+                        className="ml-2 w-7 h-7 flex items-center justify-center rounded-lg text-red-400 hover:text-white hover:bg-red-500 text-xs opacity-0 group-hover:opacity-100 transition-all"
+                        title="Sil"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -347,11 +412,12 @@ export default function SettingsPage() {
           suppliers={suppliers}
         />
       )}
-      {showBulkPriceModal && (
-        <BulkPriceModal
+      {showSupplierPriceModal && (
+        <SupplierPriceModal
           products={productList}
-          onClose={() => setShowBulkPriceModal(false)}
-          onDone={() => setShowBulkPriceModal(false)}
+          suppliers={suppliers}
+          onClose={() => setShowSupplierPriceModal(false)}
+          onDone={() => setShowSupplierPriceModal(false)}
         />
       )}
     </div>

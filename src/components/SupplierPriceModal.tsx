@@ -2,20 +2,18 @@ import { useState, useMemo } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { toast } from "react-toastify";
-import type { BulkPriceModalProps } from "../types/components";
+import type { SupplierPriceModalProps } from "../types/components";
 
-type FilterType = "all" | "supplier" | "category";
 type TargetField = "price" | "cost" | "both";
 type AdjustMethod = "percent_up" | "percent_down" | "fixed_up" | "fixed_down";
 
-
-export default function BulkPriceModal({
+export default function SupplierPriceModal({
     products,
+    suppliers,
     onClose,
     onDone,
-}: BulkPriceModalProps) {
-    const [filterType, setFilterType] = useState<FilterType>("all");
-    const [filterValue, setFilterValue] = useState<string>("");
+}: SupplierPriceModalProps) {
+    const [selectedSupplier, setSelectedSupplier] = useState<string>("");
     const [targetField, setTargetField] = useState<TargetField>("price");
     const [method, setMethod] = useState<AdjustMethod>("percent_up");
     const [amount, setAmount] = useState<string>("");
@@ -23,31 +21,18 @@ export default function BulkPriceModal({
     const [showConfirm, setShowConfirm] = useState<boolean>(false);
     const [isApplying, setIsApplying] = useState<boolean>(false);
 
-    // Unique suppliers and categories from products
-    const suppliers = useMemo(
-        () => Array.from(new Set(products.map((p) => p.supplier).filter(Boolean))) as string[],
-        [products]
-    );
-    const categories = useMemo(
-        () => Array.from(new Set(products.map((p) => p.category).filter(Boolean))) as string[],
-        [products]
-    );
-
-    // Filtered products
+    // Filter products by selected supplier
     const filtered = useMemo(() => {
-        if (filterType === "all") return products;
-        if (filterType === "supplier")
-            return products.filter((p) => p.supplier === filterValue);
-        if (filterType === "category")
-            return products.filter((p) => p.category === filterValue);
-        return products;
-    }, [products, filterType, filterValue]);
+        if (!selectedSupplier) return [];
+        return products.filter((p) => p.supplier === selectedSupplier);
+    }, [products, selectedSupplier]);
 
     // Calculate new price
     const calcNew = (old: number): number => {
         const val: number = parseFloat(amount) || 0;
         if (method === "percent_up") return +(old * (1 + val / 100)).toFixed(2);
-        if (method === "percent_down") return +Math.max(old * (1 - val / 100), 0).toFixed(2);
+        if (method === "percent_down")
+            return +Math.max(old * (1 - val / 100), 0).toFixed(2);
         if (method === "fixed_up") return +(old + val).toFixed(2);
         if (method === "fixed_down") return +Math.max(old - val, 0).toFixed(2);
         return old;
@@ -59,9 +44,15 @@ export default function BulkPriceModal({
             name: p.name,
             barcode: p.barcode,
             oldPrice: p.price,
-            newPrice: targetField === "price" || targetField === "both" ? calcNew(p.price) : p.price,
+            newPrice:
+                targetField === "price" || targetField === "both"
+                    ? calcNew(p.price)
+                    : p.price,
             oldCost: p.cost ?? 0,
-            newCost: targetField === "cost" || targetField === "both" ? calcNew(p.cost ?? 0) : (p.cost ?? 0),
+            newCost:
+                targetField === "cost" || targetField === "both"
+                    ? calcNew(p.cost ?? 0)
+                    : p.cost ?? 0,
         }));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [filtered, targetField, method, amount]);
@@ -69,9 +60,8 @@ export default function BulkPriceModal({
     const amountNum: number = parseFloat(amount) || 0;
     const isValid: boolean = amountNum > 0 && filtered.length > 0;
 
-    const handleApply = async () => {
+    const handleApply: () => Promise<void> = async () => {
         if (!isValid) return;
-
         setIsApplying(true);
         try {
             for (const p of filtered) {
@@ -107,63 +97,41 @@ export default function BulkPriceModal({
                 {/* Header */}
                 <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 shrink-0">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                        📊 Toplu Fiyat Güncelleme
+                        📊 Toptancı Bazlı Fiyat Güncelleme
                     </h2>
                     <p className="text-indigo-200 text-sm mt-1">
-                        Toptancı veya kategoriye göre toplu zam/indirim uygulayın
+                        Toptancı seçerek toplu zam veya indirim uygulayın
                     </p>
                 </div>
 
                 {/* Body */}
                 <div className="p-6 space-y-5 overflow-y-auto flex-1">
-                    {/* Filter Section */}
+                    {/* Supplier Selection */}
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            🎯 Hangi ürünlere uygulanacak?
+                            🏪 Toptancı Seçin
                         </label>
-                        <div className="flex gap-2 mb-3">
-                            {(["all", "supplier", "category"] as FilterType[]).map((f) => (
-                                <button
-                                    key={f}
-                                    onClick={() => { setFilterType(f); setFilterValue(""); }}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filterType === f
-                                        ? "bg-indigo-600 text-white shadow-md"
-                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                        }`}
-                                >
-                                    {f === "all" ? "Tümü" : f === "supplier" ? "🏪 Toptancı" : "📦 Kategori"}
-                                </button>
+                        <select
+                            value={selectedSupplier}
+                            onChange={(e) => {
+                                setSelectedSupplier(e.target.value);
+                                setShowPreview(false);
+                                setShowConfirm(false);
+                            }}
+                            className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-indigo-500 outline-none transition-all"
+                        >
+                            <option value="">Toptancı seçin...</option>
+                            {suppliers.map((s) => (
+                                <option key={s} value={s}>
+                                    {s}
+                                </option>
                             ))}
-                        </div>
-
-                        {filterType === "supplier" && (
-                            <select
-                                value={filterValue}
-                                onChange={(e) => setFilterValue(e.target.value)}
-                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-indigo-500 outline-none"
-                            >
-                                <option value="">Toptancı seçin...</option>
-                                {suppliers.map((s) => (
-                                    <option key={s} value={s}>{s}</option>
-                                ))}
-                            </select>
+                        </select>
+                        {selectedSupplier && (
+                            <div className="mt-2 px-3 py-1.5 bg-indigo-50 rounded-lg text-sm text-indigo-700 font-medium">
+                                {filtered.length} ürün etkilenecek
+                            </div>
                         )}
-                        {filterType === "category" && (
-                            <select
-                                value={filterValue}
-                                onChange={(e) => setFilterValue(e.target.value)}
-                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-indigo-500 outline-none"
-                            >
-                                <option value="">Kategori seçin...</option>
-                                {categories.map((c) => (
-                                    <option key={c} value={c}>{c}</option>
-                                ))}
-                            </select>
-                        )}
-
-                        <div className="mt-2 px-3 py-1.5 bg-indigo-50 rounded-lg text-sm text-indigo-700 font-medium">
-                            {filtered.length} ürün etkilenecek
-                        </div>
                     </div>
 
                     {/* Target Field */}
@@ -181,7 +149,11 @@ export default function BulkPriceModal({
                                         : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                                         }`}
                                 >
-                                    {f === "price" ? "Satış Fiyatı" : f === "cost" ? "Alış Fiyatı" : "Her İkisi"}
+                                    {f === "price"
+                                        ? "Satış Fiyatı"
+                                        : f === "cost"
+                                            ? "Alış Fiyatı"
+                                            : "Her İkisi"}
                                 </button>
                             ))}
                         </div>
@@ -220,7 +192,6 @@ export default function BulkPriceModal({
                                 min={0}
                                 step={method.startsWith("percent") ? "1" : "0.01"}
                                 className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-lg font-medium focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition-all"
-                                autoFocus
                             />
                         </div>
                     </div>
@@ -231,7 +202,8 @@ export default function BulkPriceModal({
                             onClick={() => setShowPreview(!showPreview)}
                             className="w-full py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
                         >
-                            {showPreview ? "▼ Önizlemeyi Gizle" : "▶ Önizlemeyi Göster"} ({filtered.length} ürün)
+                            {showPreview ? "▼ Önizlemeyi Gizle" : "▶ Önizlemeyi Göster"} (
+                            {filtered.length} ürün)
                         </button>
                     )}
 
@@ -241,17 +213,27 @@ export default function BulkPriceModal({
                             <table className="min-w-full text-sm">
                                 <thead className="bg-gray-50 sticky top-0">
                                     <tr>
-                                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Ürün</th>
+                                        <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">
+                                            Ürün
+                                        </th>
                                         {(targetField === "price" || targetField === "both") && (
                                             <>
-                                                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Satış (Eski)</th>
-                                                <th className="px-3 py-2 text-right text-xs font-semibold text-green-600">Satış (Yeni)</th>
+                                                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">
+                                                    Satış (Eski)
+                                                </th>
+                                                <th className="px-3 py-2 text-right text-xs font-semibold text-green-600">
+                                                    Satış (Yeni)
+                                                </th>
                                             </>
                                         )}
                                         {(targetField === "cost" || targetField === "both") && (
                                             <>
-                                                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Alış (Eski)</th>
-                                                <th className="px-3 py-2 text-right text-xs font-semibold text-green-600">Alış (Yeni)</th>
+                                                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">
+                                                    Alış (Eski)
+                                                </th>
+                                                <th className="px-3 py-2 text-right text-xs font-semibold text-green-600">
+                                                    Alış (Yeni)
+                                                </th>
                                             </>
                                         )}
                                     </tr>
@@ -259,17 +241,27 @@ export default function BulkPriceModal({
                                 <tbody className="divide-y divide-gray-100">
                                     {preview.map((p) => (
                                         <tr key={p.barcode} className="hover:bg-gray-50">
-                                            <td className="px-4 py-1.5 text-gray-800 truncate max-w-[150px]">{p.name}</td>
+                                            <td className="px-4 py-1.5 text-gray-800 truncate max-w-[150px]">
+                                                {p.name}
+                                            </td>
                                             {(targetField === "price" || targetField === "both") && (
                                                 <>
-                                                    <td className="px-3 py-1.5 text-right text-gray-500">₺{p.oldPrice.toLocaleString("tr-TR")}</td>
-                                                    <td className="px-3 py-1.5 text-right font-semibold text-green-600">₺{p.newPrice.toLocaleString("tr-TR")}</td>
+                                                    <td className="px-3 py-1.5 text-right text-gray-500">
+                                                        ₺{p.oldPrice.toLocaleString("tr-TR")}
+                                                    </td>
+                                                    <td className="px-3 py-1.5 text-right font-semibold text-green-600">
+                                                        ₺{p.newPrice.toLocaleString("tr-TR")}
+                                                    </td>
                                                 </>
                                             )}
                                             {(targetField === "cost" || targetField === "both") && (
                                                 <>
-                                                    <td className="px-3 py-1.5 text-right text-gray-500">₺{p.oldCost.toLocaleString("tr-TR")}</td>
-                                                    <td className="px-3 py-1.5 text-right font-semibold text-green-600">₺{p.newCost.toLocaleString("tr-TR")}</td>
+                                                    <td className="px-3 py-1.5 text-right text-gray-500">
+                                                        ₺{p.oldCost.toLocaleString("tr-TR")}
+                                                    </td>
+                                                    <td className="px-3 py-1.5 text-right font-semibold text-green-600">
+                                                        ₺{p.newCost.toLocaleString("tr-TR")}
+                                                    </td>
                                                 </>
                                             )}
                                         </tr>
@@ -288,10 +280,21 @@ export default function BulkPriceModal({
                             <div className="flex-1">
                                 <p className="font-bold text-gray-900 mb-1">Emin misiniz?</p>
                                 <p className="text-sm text-gray-700">
+                                    <strong>{selectedSupplier}</strong> toptancısına ait{" "}
                                     <strong>{filtered.length}</strong> ürünün{" "}
-                                    {targetField === "price" ? "satış fiyatı" : targetField === "cost" ? "alış fiyatı" : "satış ve alış fiyatı"}{" "}
-                                    {method === "percent_up" ? `%${amount} artırılacak` : method === "percent_down" ? `%${amount} azaltılacak` : method === "fixed_up" ? `₺${amount} artırılacak` : `₺${amount} azaltılacak`}.
-                                    Bu işlem geri alınamaz.
+                                    {targetField === "price"
+                                        ? "satış fiyatı"
+                                        : targetField === "cost"
+                                            ? "alış fiyatı"
+                                            : "satış ve alış fiyatı"}{" "}
+                                    {method === "percent_up"
+                                        ? `%${amount} artırılacak`
+                                        : method === "percent_down"
+                                            ? `%${amount} azaltılacak`
+                                            : method === "fixed_up"
+                                                ? `₺${amount} artırılacak`
+                                                : `₺${amount} azaltılacak`}
+                                    . Bu işlem geri alınamaz.
                                 </p>
                                 <div className="flex gap-2 mt-3">
                                     <button
@@ -324,7 +327,10 @@ export default function BulkPriceModal({
                         Vazgeç
                     </button>
                     <button
-                        onClick={() => { setShowConfirm(true); setShowPreview(true); }}
+                        onClick={() => {
+                            setShowConfirm(true);
+                            setShowPreview(true);
+                        }}
                         disabled={!isValid || isApplying || showConfirm}
                         className={`flex-1 py-3 font-semibold rounded-xl active:scale-95 transition-all ${isValid && !isApplying && !showConfirm
                             ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 shadow-lg"
