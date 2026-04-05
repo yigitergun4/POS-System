@@ -197,23 +197,28 @@ export default function SalesPage() {
               <div className="mb-4 flex items-center justify-between bg-white border border-gray-200 rounded-xl shadow p-4">
                 <div>
                   <p className="text-sm text-gray-500">Son Ürün</p>
-                  {lastProduct ? (
-                    <div>
-                      <p className="text-lg font-bold text-gray-800">
-                        {lastProduct.name}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {lastProduct.price} ₺ × {lastProduct.qty} adet
-                      </p>
-                      <p className="text-sm font-semibold text-blue-600 mt-1">
-                        Ara Toplam: {lastProduct.price * lastProduct.qty} ₺
-                      </p>
-                    </div>
-                  ) : (
+                  {lastProduct ? (() => {
+                    const { updatedItems } = applyCampaignsToCart([lastProduct], campaigns, "cash");
+                    const p = updatedItems[0];
+                    return (
+                      <div>
+                        <p className="text-lg font-bold text-gray-800">
+                          {p.name}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {p.price} ₺ × {p.qty} adet
+                        </p>
+                        <p className="text-sm font-semibold text-blue-600 mt-1">
+                          Ara Toplam: {p.price * p.qty} ₺
+                        </p>
+                      </div>
+                    );
+                  })() : (
                     <p className="text-lg font-bold text-gray-400">
                       Henüz okutulmadı
                     </p>
                   )}
+
                 </div>
                 <QuantityInput qty={qty} setQty={setQty} />
               </div>
@@ -236,7 +241,7 @@ export default function SalesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {cart.map((item) => (
+                    {cashData.updatedItems.map((item) => (
                       <tr
                         key={item.barcode}
                         className="border-b last:border-none hover:bg-gray-50"
@@ -295,8 +300,10 @@ export default function SalesPage() {
             <div className="flex-1 overflow-auto">
               <ProductGrid
                 products={allProducts}
+                campaigns={campaigns}
                 onSelect={handleSelectProduct}
               />
+
             </div>
           )}
         </div>
