@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "react-toastify";
 import Navbar from "../components/Navbar";
 import SalesPageTotalSide from "../components/SalesPageTotalSide";
@@ -18,11 +18,14 @@ import {
   increment,
 } from "firebase/firestore";
 import { type CartItem } from "../types/Product";
+import type { Campaign } from "../types/Campaign";
 import { format } from "date-fns";
+import { applyCampaignsToCart } from "../lib/pricing";
 
 export default function SalesPage() {
   const [allProducts, setAllProducts] = useState<CartItem[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [qty, setQty] = useState<number>(1);
   const [lastProduct, setLastProduct] = useState<CartItem | null>(null);
   const [tab, setTab] = useState<"barcode" | "manual">("barcode");
@@ -36,6 +39,14 @@ export default function SalesPage() {
       setAllProducts(data);
     });
 
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "campaigns"), (snapshot) => {
+      const data = snapshot.docs.map((doc) => doc.data() as Campaign);
+      setCampaigns(data);
+    });
     return () => unsubscribe();
   }, []);
 
@@ -58,11 +69,14 @@ export default function SalesPage() {
 
       try {
         const todayId: string = format(new Date(), "yyyy-MM-dd");
+        
+        const { updatedItems, total: finalTotal } = applyCampaignsToCart(cart, campaigns, paymentMethod);
+
         await addDoc(collection(db, "sales"), {
           timestamp: serverTimestamp(),
           saleDay: todayId,
-          items: cart,
-          total,
+          items: updatedItems,
+          total: finalTotal,
           paymentMethod,
           ...(splitDetails ? { splitDetails } : {}),
         });
@@ -147,10 +161,11 @@ export default function SalesPage() {
     });
   };
 
-  const total: number = cart.reduce(
-    (sum, item) => sum + item.price * item.qty,
-    0
-  );
+  const cashData = useMemo(() => applyCampaignsToCart(cart, campaigns, "cash"), [cart, campaigns]);
+  const cardData = useMemo(() => applyCampaignsToCart(cart, campaigns, "card"), [cart, campaigns]);
+
+  const total = cashData.total;
+  const cardTotal = cardData.total;
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
@@ -161,8 +176,8 @@ export default function SalesPage() {
             <button
               onClick={() => setTab("barcode")}
               className={`px-4 py-2 rounded-lg font-medium ${tab === "barcode"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-700"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700"
                 }`}
             >
               Barkod
@@ -170,8 +185,8 @@ export default function SalesPage() {
             <button
               onClick={() => setTab("manual")}
               className={`px-4 py-2 rounded-lg font-medium ${tab === "manual"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 text-gray-700"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-700"
                 }`}
             >
               Ürün Seç
@@ -287,6 +302,7 @@ export default function SalesPage() {
         </div>
         <SalesPageTotalSide
           total={total}
+          cardTotal={cardTotal}
           onCashPayment={handleCashPayment}
           onCardPayment={handleCardPayment}
           onClearCart={handleClearCart}

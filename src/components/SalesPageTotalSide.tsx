@@ -3,6 +3,7 @@ import TotalCard from "./SalesPageTotalCard";
 
 interface SalesPageTotalSideProps {
   total: number;
+  cardTotal?: number;
   onCashPayment?: () => Promise<void>;
   onCardPayment?: () => Promise<void>;
   onClearCart?: () => void;
@@ -12,6 +13,7 @@ interface SalesPageTotalSideProps {
 
 export default function SalesPageTotalSide({
   total,
+  cardTotal = total,
   onCashPayment,
   onCardPayment,
   onClearCart,
@@ -30,7 +32,7 @@ export default function SalesPageTotalSide({
           disabled={total === 0}
         />
         <PaymentButton
-          label="💳 Kart ile Ödeme"
+          label={cardTotal !== total ? `💳 Kart ile Ödeme (${cardTotal} ₺)` : `💳 Kart ile Ödeme`}
           color="blue"
           onClick={onCardPayment}
           disabled={total === 0}

@@ -200,13 +200,12 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
     searchText.trim() !== "" || paymentMethodFilter !== "all";
 
   // Get row background color based on payment method
-  const getRowStyles = (
+  const getRowStyles: (paymentMethod: "cash" | "card" | "family" | "split", index: number) => string = (
     paymentMethod: "cash" | "card" | "family" | "split",
     index: number
   ): string => {
     const isEven: boolean = index % 2 === 0;
     const baseStripe: string = isEven ? "bg-gray-50" : "bg-white";
-
     // Add subtle left border color based on payment method
     const borderColors: Record<string, string> = {
       cash: "border-l-4 border-l-green-400",
@@ -385,7 +384,7 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
                 return (
                   <tr
                     key={sale.id}
-                    className={getRowStyles(sale.paymentMethod, index)}
+                    className={getRowStyles(sale.paymentMethod, index) + " hover:bg-gray-200"}
                   >
                     <td className="px-4 py-3">
                       <div className="flex flex-col">

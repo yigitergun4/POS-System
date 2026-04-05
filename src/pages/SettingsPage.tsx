@@ -16,11 +16,12 @@ import type { CartItem } from "../types/Product";
 import ProductTableSettingsPage from "../components/ProductTableSettingsPage";
 import AddProductModalSettingsPage from "../components/AddProductModalSettingsPage";
 import SupplierPriceModal from "../components/SupplierPriceModal";
+import CampaignsSettingsTab from "../components/CampaignsSettingsTab";
 import { toast } from "react-toastify";
 import { useConfirmation } from "../contexts/ConfirmationContext";
 import { DEFAULT_SUPPLIERS } from "../config";
 
-type ActiveTab = "general" | "products" | "suppliers";
+type ActiveTab = "general" | "products" | "suppliers" | "campaigns";
 
 export default function SettingsPage() {
   const { confirm } = useConfirmation();
@@ -237,6 +238,13 @@ export default function SettingsPage() {
         >
           🏪 Toptancılar
         </button>
+        <button
+          onClick={() => setActiveTab("campaigns")}
+          className={`px-4 py-2 rounded-lg ${activeTab === "campaigns" ? "bg-blue-500 text-white" : "bg-gray-100"
+            }`}
+        >
+          🎁 Kampanyalar
+        </button>
       </div>
 
       {activeTab === "general" && (
@@ -401,6 +409,10 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
+      )}
+
+      {activeTab === "campaigns" && (
+        <CampaignsSettingsTab />
       )}
 
       {showAddModal && (
