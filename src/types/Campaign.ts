@@ -2,6 +2,7 @@ export interface Campaign {
   id: string;
   name: string;
   isActive: boolean;
+  startDate?: string; // YYYY-MM-DD
   endDate?: string; // YYYY-MM-DD
   targetType: "category" | "products";
   targetCategory?: string;

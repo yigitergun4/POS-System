@@ -6,12 +6,13 @@ export const applyCampaignsToCart = (
   campaigns: Campaign[],
   paymentMethod: "cash" | "card" | "family" | "split"
 ) => {
-  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+  const today: string = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 
-  const activeCampaigns = campaigns.filter((c) => {
+  const activeCampaigns: Campaign[] = campaigns.filter((c) => {
     if (!c.isActive) return false;
-    
+
     // Check Date
+    if (c.startDate && c.startDate > today) return false;
     if (c.endDate && c.endDate < today) return false;
 
     // Check Payment Method
@@ -20,17 +21,17 @@ export const applyCampaignsToCart = (
     return true;
   });
 
-  let newItems = cart.map((item) => {
-    let finalItemPrice = item.price;
-    const cat = (item.category || "").toLowerCase();
-    const name = (item.name || "").toLowerCase();
-    const barcode = item.barcode;
+  let newItems: CartItem[] = cart.map((item) => {
+    let finalItemPrice: number = item.price;
+    const cat: string = (item.category || "").toLowerCase();
+    const name: string = (item.name || "").toLowerCase();
+    const barcode: string = item.barcode;
 
     for (const camp of activeCampaigns) {
-      let isTarget = false;
+      let isTarget: boolean = false;
 
       if (camp.targetType === "category") {
-        const target = (camp.targetCategory || "").toLowerCase();
+        const target: string = (camp.targetCategory || "").toLowerCase();
         if (cat.includes(target) || name.includes(target)) {
           isTarget = true;
         }
@@ -48,7 +49,7 @@ export const applyCampaignsToCart = (
         } else if (camp.effectType === "percentage_discount") {
           finalItemPrice -= (finalItemPrice * camp.effectValue) / 100;
         }
-        
+
         if (finalItemPrice < 0) finalItemPrice = 0;
       }
     }

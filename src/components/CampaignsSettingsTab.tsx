@@ -10,8 +10,9 @@ export default function CampaignsSettingsTab(): React.ReactElement {
   const { confirm } = useConfirmation();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [products, setProducts] = useState<CartItem[]>([]);
-  const [productSearch, setProductSearch] = useState("");
-  
+  const [productSearch, setProductSearch] = useState<string>("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   const [newCampaign, setNewCampaign] = useState<Partial<Campaign>>({
     name: "",
     isActive: true,
@@ -21,6 +22,7 @@ export default function CampaignsSettingsTab(): React.ReactElement {
     conditionPaymentMethod: "card",
     effectType: "add_fee_per_item",
     effectValue: 0,
+    startDate: new Date().toISOString().split("T")[0],
     endDate: "",
   });
 
@@ -29,7 +31,7 @@ export default function CampaignsSettingsTab(): React.ReactElement {
       const data = snapshot.docs.map((doc) => doc.data() as Campaign);
       setCampaigns(data);
     });
-    
+
     const unsubP = onSnapshot(collection(db, "products"), (snapshot) => {
       const data = snapshot.docs.map((doc) => doc.data() as CartItem);
       setProducts(data);
@@ -41,7 +43,7 @@ export default function CampaignsSettingsTab(): React.ReactElement {
   const filteredProducts = useMemo(() => {
     if (!productSearch) return [];
     const s = productSearch.toLowerCase();
-    return products.filter(p => 
+    return products.filter(p =>
       p.name.toLowerCase().includes(s) || p.barcode.toLowerCase().includes(s)
     ).slice(0, 5);
   }, [products, productSearch]);
@@ -56,12 +58,32 @@ export default function CampaignsSettingsTab(): React.ReactElement {
     });
   };
 
+  // handleCancelEdit handles resetting the campaign form to its default state.
+  // We use a regular function or a const without strict event typing to allow it to be called
+  // both as an event handler (with 1 arg) and manually (with 0 args).
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setNewCampaign({
+      name: "",
+      isActive: true,
+      targetType: "category",
+      targetCategory: "",
+      targetBarcodes: [],
+      conditionPaymentMethod: "card",
+      effectType: "add_fee_per_item",
+      effectValue: 0,
+      startDate: new Date().toISOString().split("T")[0],
+      endDate: "",
+    });
+    setProductSearch("");
+  };
+
   const handleAddCampaign = async () => {
     if (!newCampaign.name?.trim()) {
       toast.error("Kampanya adı zorunludur!");
       return;
     }
-    
+
     if (newCampaign.targetType === "category" && !newCampaign.targetCategory?.trim()) {
       toast.error("Hedef kategori zorunludur!");
       return;
@@ -72,7 +94,7 @@ export default function CampaignsSettingsTab(): React.ReactElement {
       return;
     }
 
-    const id = Date.now().toString();
+    const id = editingId || Date.now().toString();
     const campaignToAdd: Campaign = {
       id,
       name: newCampaign.name!,
@@ -83,28 +105,36 @@ export default function CampaignsSettingsTab(): React.ReactElement {
       conditionPaymentMethod: newCampaign.conditionPaymentMethod as any,
       effectType: newCampaign.effectType as any,
       effectValue: Number(newCampaign.effectValue),
+      startDate: newCampaign.startDate || "",
       endDate: newCampaign.endDate || "",
     };
 
     try {
       await setDoc(doc(db, "campaigns", id), campaignToAdd);
-      toast.success("Kampanya eklendi ✅");
-      setNewCampaign({
-        name: "",
-        isActive: true,
-        targetType: "category",
-        targetCategory: "",
-        targetBarcodes: [],
-        conditionPaymentMethod: "card",
-        effectType: "add_fee_per_item",
-        effectValue: 0,
-        endDate: "",
-      });
-      setProductSearch("");
+      toast.success(editingId ? "Kampanya güncellendi ✨" : "Kampanya eklendi ✅");
+      handleCancelEdit();
     } catch (err) {
       toast.error("Hata oluştu!");
     }
   };
+
+  const handleEditCampaign = (campaign: Campaign) => {
+    setEditingId(campaign.id);
+    setNewCampaign({
+      name: campaign.name,
+      isActive: campaign.isActive,
+      targetType: campaign.targetType,
+      targetCategory: campaign.targetCategory,
+      targetBarcodes: campaign.targetBarcodes,
+      conditionPaymentMethod: campaign.conditionPaymentMethod,
+      effectType: campaign.effectType,
+      effectValue: campaign.effectValue,
+      startDate: campaign.startDate || "",
+      endDate: campaign.endDate || "",
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
 
   const handleToggleActive = async (campaign: Campaign) => {
     try {
@@ -156,10 +186,10 @@ export default function CampaignsSettingsTab(): React.ReactElement {
       {/* Campaign Form Card */}
       <div className="bg-white shadow-md rounded-xl border border-gray-200 p-6 transition-all">
         <h3 className="text-lg font-semibold text-gray-800 mb-5 flex items-center gap-2">
-          <span className="text-indigo-500">✨</span>
-          <span>Yeni Kampanya Oluştur</span>
+          <span className="text-indigo-500">{editingId ? "📝" : "✨"}</span>
+          <span>{editingId ? "Kampanyayı Düzenle" : "Yeni Kampanya Oluştur"}</span>
         </h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-5">
           <div className="group">
             <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase transition-colors group-focus-within:text-indigo-600">Kampanya Adı</label>
@@ -169,6 +199,16 @@ export default function CampaignsSettingsTab(): React.ReactElement {
               className="border-2 border-gray-100 rounded-xl px-3 py-2.5 w-full text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/50 transition-all placeholder:text-gray-300"
               value={newCampaign.name}
               onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })}
+            />
+          </div>
+          <div className="group">
+            <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase transition-colors group-focus-within:text-indigo-600">Başlangıç Tarihi</label>
+            <input
+              type="date"
+              className="border-2 border-gray-100 rounded-xl px-3 py-2.5 w-full text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/50 transition-all cursor-pointer"
+              value={newCampaign.startDate}
+              min={new Date().toISOString().split("T")[0]}
+              onChange={(e) => setNewCampaign({ ...newCampaign, startDate: e.target.value })}
             />
           </div>
           <div className="group">
@@ -230,7 +270,7 @@ export default function CampaignsSettingsTab(): React.ReactElement {
                 />
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 opacity-30">🔍</span>
               </div>
-              
+
               {/* Selected Chips */}
               <div className="flex flex-wrap gap-1.5 mt-2 min-h-[1.5rem]">
                 {newCampaign.targetBarcodes?.map(b => {
@@ -238,8 +278,8 @@ export default function CampaignsSettingsTab(): React.ReactElement {
                   return (
                     <span key={b} className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 border border-indigo-100 animate-in fade-in zoom-in duration-200">
                       {p?.name || b}
-                      <button 
-                        onClick={() => toggleProductSelection(b)} 
+                      <button
+                        onClick={() => toggleProductSelection(b)}
                         className="hover:bg-indigo-200 rounded-full w-4 h-4 flex items-center justify-center transition-colors cursor-pointer"
                       >
                         ×
@@ -279,7 +319,7 @@ export default function CampaignsSettingsTab(): React.ReactElement {
               )}
             </div>
           )}
-          
+
           <div className="group">
             <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase transition-colors group-focus-within:text-indigo-600">İşlem & Miktar</label>
             <div className="flex gap-3">
@@ -305,12 +345,20 @@ export default function CampaignsSettingsTab(): React.ReactElement {
           </div>
         </div>
 
-        <div className="flex justify-end pt-2 border-t border-gray-50 mt-2">
+        <div className="flex justify-end pt-2 border-t border-gray-50 mt-2 gap-3">
+          {editingId && (
+            <button
+              onClick={handleCancelEdit}
+              className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold px-8 py-3 rounded-xl text-sm transition-all active:scale-95 cursor-pointer"
+            >
+              Vazgeç
+            </button>
+          )}
           <button
             onClick={handleAddCampaign}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-3 rounded-xl text-sm shadow-lg hover:shadow-indigo-200 transition-all active:scale-95 cursor-pointer flex items-center gap-2"
+            className={`${editingId ? "bg-amber-500 hover:bg-amber-600 shadow-amber-100" : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100"} text-white font-bold px-8 py-3 rounded-xl text-sm shadow-lg transition-all active:scale-95 cursor-pointer flex items-center gap-2`}
           >
-            📂 Kampanyayı Kaydet
+            {editingId ? "📝 Değişiklikleri Kaydet" : "📂 Kampanyayı Kaydet"}
           </button>
         </div>
       </div>
@@ -321,7 +369,7 @@ export default function CampaignsSettingsTab(): React.ReactElement {
           <h3 className="text-xs font-extrabold text-gray-400 uppercase tracking-widest">Yürürlükteki Kurallar</h3>
           <span className="bg-indigo-100 text-indigo-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold">{campaigns.length} Kural</span>
         </div>
-        
+
         {campaigns.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-gray-300">
             <span className="text-6xl mb-4">📭</span>
@@ -336,7 +384,7 @@ export default function CampaignsSettingsTab(): React.ReactElement {
                   <th className="px-6 py-4 text-left">Kampanya Açıklaması</th>
                   <th className="px-6 py-4 text-left">Hedef</th>
                   <th className="px-6 py-4 text-center">Detaylar</th>
-                  <th className="px-6 py-4 text-center">Bitiş</th>
+                  <th className="px-6 py-4 text-center">Geçerlilik</th>
                   <th className="px-6 py-4 text-center w-20">İşlem</th>
                 </tr>
               </thead>
@@ -376,36 +424,54 @@ export default function CampaignsSettingsTab(): React.ReactElement {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col items-center">
-                           <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 uppercase">
-                                {c.conditionPaymentMethod === "ALL" ? "Tümü" : c.conditionPaymentMethod === "cash" ? "Nakit" : "Kart"}
-                              </span>
-                              <span className={`text-sm font-black ${c.effectType === "add_fee_per_item" ? "text-red-500" : "text-green-600"}`}>
-                                {c.effectType === "add_fee_per_item" ? "↑" : "↓"} 
-                                {c.effectValue}{c.effectType === "percentage_discount" ? "%" : " ₺"}
-                              </span>
-                           </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 uppercase">
+                              {c.conditionPaymentMethod === "ALL" ? "Tümü" : c.conditionPaymentMethod === "cash" ? "Nakit" : "Kart"}
+                            </span>
+                            <span className={`text-sm font-black ${c.effectType === "add_fee_per_item" ? "text-red-500" : "text-green-600"}`}>
+                              {c.effectType === "add_fee_per_item" ? "↑" : "↓"}
+                              {c.effectValue}{c.effectType === "percentage_discount" ? "%" : " ₺"}
+                            </span>
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        {c.endDate ? (
-                          <span className={`text-[11px] font-bold px-2 py-1 rounded-lg border ${isExpired ? "bg-red-50 text-red-500 border-red-100" : "bg-gray-100 text-gray-600 border-gray-200"}`}>
-                            {c.endDate} {isExpired && "⚠️ DOLDU"}
-                          </span>
-                        ) : (
-                          <span className="text-[11px] text-gray-300 font-bold italic">Süresiz</span>
-                        )}
+                        <div className="flex flex-col items-center gap-1">
+                          {c.startDate ? (
+                            <span className="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-1.5 rounded">Başlangıç: {c.startDate}</span>
+                          ) : (
+                            <span className="text-[10px] text-gray-300 italic">Hemen</span>
+                          )}
+                          {c.endDate ? (
+                            <span className={`text-[11px] font-bold px-2 py-1 rounded-lg border ${isExpired ? "bg-red-50 text-red-500 border-red-100" : "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                              {c.endDate} {isExpired && "⚠️ DOLDU"}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-gray-300 font-bold italic">Süresiz</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => handleDeleteCampaign(c.id, c.name)}
-                          className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all cursor-pointer opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100"
-                          title="Kuralı Sil"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                          </svg>
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => handleEditCampaign(c)}
+                            className="p-2 text-gray-300 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-all cursor-pointer opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100"
+                            title="Düzenle"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCampaign(c.id, c.name)}
+                            className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all cursor-pointer opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100"
+                            title="Kuralı Sil"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
