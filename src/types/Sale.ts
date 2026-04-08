@@ -4,6 +4,7 @@ export type Sale = {
   total: number;
   paymentMethod: "cash" | "card" | "family" | "split";
   splitDetails?: { cashAmount: number; cardAmount: number };
+  cardCommission?: number;
   items: {
     name: string;
     category?: string;

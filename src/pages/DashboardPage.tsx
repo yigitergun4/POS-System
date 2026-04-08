@@ -93,12 +93,13 @@ export default function DashboardPage() {
   }, [sales, range, startDate, endDate]);
 
   // Main KPIs - now filtered by selected category
-  const { totalSales, cashSales, cardSales, familySales, avgBasket, transactionCounts } =
+  const { totalSales, cashSales, cardSales, familySales, avgBasket, transactionCounts, totalCommission } =
     useMemo(() => {
       let totalSales: number = 0;
       let cashSales: number = 0;
       let cardSales: number = 0;
       let familySales: number = 0;
+      let totalCommission: number = 0;
       const cashTransactions = new Set<string>();
       const cardTransactions = new Set<string>();
       const familyTransactions = new Set<string>();
@@ -125,6 +126,9 @@ export default function DashboardPage() {
             cardSales += s.splitDetails.cardAmount;
             cashTransactions.add(s.id);
             cardTransactions.add(s.id);
+          }
+          if (s.cardCommission) {
+            totalCommission += s.cardCommission;
           }
           allTransactions.add(s.id);
         } else {
@@ -158,6 +162,10 @@ export default function DashboardPage() {
               cashTransactions.add(s.id);
               cardTransactions.add(s.id);
             }
+            if (s.cardCommission) {
+              const ratio: number = saleTotal / s.total;
+              totalCommission += s.cardCommission * ratio;
+            }
             allTransactions.add(s.id);
           }
         }
@@ -182,6 +190,7 @@ export default function DashboardPage() {
           family: familyTransactions.size,
           nonFamily: nonFamilyTransactions,
         },
+        totalCommission,
       };
     }, [filteredSales, selectedCategory]);
   const totalSalesWithoutFamily: number = totalSales - familySales;
@@ -346,15 +355,15 @@ export default function DashboardPage() {
       });
     });
 
-    const grossProfit: number = totalRevenue - totalCost;
+    const grossProfit: number = totalRevenue - totalCost - totalCommission;
     const profitMargin: number = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 
     return { totalRevenue, totalCost, grossProfit, profitMargin };
-  }, [filteredSales, selectedCategory]);
+  }, [filteredSales, selectedCategory, totalCommission]);
 
   // Daily Profit Trend Data
   const profitTrendData = useMemo(() => {
-    const dailyData: Map<number, { revenue: number; cost: number }> = new Map();
+    const dailyData: Map<number, { revenue: number; cost: number; commission: number }> = new Map();
 
     filteredSales.forEach((sale) => {
       if (sale.paymentMethod === "family") return;
@@ -362,13 +371,30 @@ export default function DashboardPage() {
       const dayStart: Date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
       const key: number = dayStart.getTime();
 
-      const prev = dailyData.get(key) || { revenue: 0, cost: 0 };
+      const prev = dailyData.get(key) || { revenue: 0, cost: 0, commission: 0 };
 
       sale.items.forEach((item) => {
         if (selectedCategory !== "Tümü" && item.category !== selectedCategory) return;
         prev.revenue += (item.price || 0) * item.qty;
         prev.cost += (item.cost || 0) * item.qty;
       });
+
+      if (sale.cardCommission) {
+        if (selectedCategory === "Tümü") {
+          prev.commission += sale.cardCommission;
+        } else {
+          let saleTotal = 0;
+          sale.items.forEach(item => {
+            if (item.category === selectedCategory) {
+              saleTotal += (item.price || 0) * item.qty;
+            }
+          });
+          if (saleTotal > 0) {
+            const ratio = saleTotal / sale.total;
+            prev.commission += sale.cardCommission * ratio;
+          }
+        }
+      }
 
       dailyData.set(key, prev);
     });
@@ -379,24 +405,41 @@ export default function DashboardPage() {
         date: ts,
         revenue: data.revenue,
         cost: data.cost,
-        profit: data.revenue - data.cost,
+        profit: data.revenue - data.cost - data.commission,
       }));
   }, [filteredSales, selectedCategory]);
 
   // Category Profit Breakdown
   const categoryProfitData = useMemo(() => {
-    const catData: Record<string, { revenue: number; cost: number; units: number }> = {};
+    const catData: Record<string, { revenue: number; cost: number; units: number; commission: number }> = {};
 
     filteredSales.forEach((sale) => {
       if (sale.paymentMethod === "family") return;
       sale.items.forEach((item) => {
         const cat: string = item.category || "Diğer";
         if (selectedCategory !== "Tümü" && cat !== selectedCategory) return;
-        if (!catData[cat]) catData[cat] = { revenue: 0, cost: 0, units: 0 };
+        if (!catData[cat]) catData[cat] = { revenue: 0, cost: 0, units: 0, commission: 0 };
         catData[cat].revenue += (item.price || 0) * item.qty;
         catData[cat].cost += (item.cost || 0) * item.qty;
         catData[cat].units += item.qty;
       });
+
+      if (sale.cardCommission) {
+        // Distribute commission among categories based on their share in this sale
+        const saleCategoryTotals: Record<string, number> = {};
+        sale.items.forEach(item => {
+          const cat = item.category || "Diğer";
+          saleCategoryTotals[cat] = (saleCategoryTotals[cat] || 0) + (item.price || 0) * item.qty;
+        });
+
+        Object.entries(saleCategoryTotals).forEach(([cat, catTotal]) => {
+          if (selectedCategory !== "Tümü" && cat !== selectedCategory) return;
+          if (catData[cat]) {
+            const ratio = catTotal / sale.total;
+            catData[cat].commission += sale.cardCommission! * ratio;
+          }
+        });
+      }
     });
 
     return Object.entries(catData)
@@ -404,8 +447,8 @@ export default function DashboardPage() {
         category,
         revenue: data.revenue,
         cost: data.cost,
-        profit: data.revenue - data.cost,
-        margin: data.revenue > 0 ? ((data.revenue - data.cost) / data.revenue) * 100 : 0,
+        profit: data.revenue - data.cost - data.commission,
+        margin: data.revenue > 0 ? ((data.revenue - data.cost - data.commission) / data.revenue) * 100 : 0,
         units: data.units,
       }))
       .sort((a, b) => b.profit - a.profit);
@@ -529,7 +572,7 @@ export default function DashboardPage() {
 
 
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
           <SummaryCard
             title={selectedCategory === "Tümü" ? "Toplam Satış" : `${selectedCategory} Satış`}
             value={`₺${totalSalesWithoutFamily.toLocaleString("tr-TR")}`}
@@ -549,7 +592,7 @@ export default function DashboardPage() {
             value={`₺${cardSales.toLocaleString("tr-TR")}`}
             color="purple"
             icon="💳"
-            subtitle={`${transactionCounts.card} işlem`}
+            subtitle={`${transactionCounts.card} işlem / ₺${totalCommission.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} komisyon`}
           />
           <SummaryCard
             title="Aile Satış"
@@ -564,6 +607,13 @@ export default function DashboardPage() {
             color="orange"
             icon="🛒"
             subtitle="İşlem başına"
+          />
+          <SummaryCard
+            title="Kart Komisyonu"
+            value={`₺${totalCommission.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}`}
+            color="red"
+            icon="📉"
+            subtitle="%3.5 Banka kesintisi"
           />
         </div>
 
@@ -605,7 +655,7 @@ export default function DashboardPage() {
               <div className="text-2xl font-bold">
                 ₺{profitLoss.grossProfit.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </div>
-              <div className="text-white/80 text-xs mt-1">Ciro - Maliyet</div>
+              <div className="text-white/80 text-xs mt-1">Ciro - Maliyet - Komisyon</div>
             </div>
             <div className={`bg-gradient-to-br ${profitLoss.profitMargin >= 20 ? "from-teal-500 to-teal-600" : profitLoss.profitMargin >= 0 ? "from-amber-500 to-amber-600" : "from-rose-600 to-rose-700"} rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1`}>
               <div className="flex items-center justify-between mb-2">

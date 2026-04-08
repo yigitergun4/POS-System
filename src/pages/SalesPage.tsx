@@ -72,12 +72,20 @@ export default function SalesPage() {
         
         const { updatedItems, total: finalTotal } = applyCampaignsToCart(cart, campaigns, paymentMethod);
 
+        let cardCommission = 0;
+        if (paymentMethod === "card") {
+          cardCommission = finalTotal * 0.035;
+        } else if (paymentMethod === "split" && splitDetails) {
+          cardCommission = splitDetails.cardAmount * 0.035;
+        }
+
         await addDoc(collection(db, "sales"), {
           timestamp: serverTimestamp(),
           saleDay: todayId,
           items: updatedItems,
           total: finalTotal,
           paymentMethod,
+          cardCommission: Math.round(cardCommission * 100) / 100,
           ...(splitDetails ? { splitDetails } : {}),
         });
         for (const product of cart) {
