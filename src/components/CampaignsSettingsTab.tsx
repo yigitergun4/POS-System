@@ -24,6 +24,8 @@ export default function CampaignsSettingsTab(): React.ReactElement {
     effectValue: 0,
     startDate: new Date().toISOString().split("T")[0],
     endDate: "",
+    lastChangeDate: new Date().toISOString(),
+    changeLog: [],
   });
 
   useEffect(() => {
@@ -40,7 +42,7 @@ export default function CampaignsSettingsTab(): React.ReactElement {
     return () => { unsubC(); unsubP(); };
   }, []);
 
-  const filteredProducts = useMemo(() => {
+  const filteredProducts: CartItem[] = useMemo(() => {
     if (!productSearch) return [];
     const s = productSearch.toLowerCase();
     return products.filter(p =>
@@ -74,6 +76,8 @@ export default function CampaignsSettingsTab(): React.ReactElement {
       effectValue: 0,
       startDate: new Date().toISOString().split("T")[0],
       endDate: "",
+      lastChangeDate: new Date().toISOString(),
+      changeLog: [],
     });
     setProductSearch("");
   };
@@ -107,6 +111,15 @@ export default function CampaignsSettingsTab(): React.ReactElement {
       effectValue: Number(newCampaign.effectValue),
       startDate: newCampaign.startDate || "",
       endDate: newCampaign.endDate || "",
+      lastChangeDate: new Date().toISOString(),
+      changeLog: [
+        ...(newCampaign.changeLog || []),
+        {
+          date: new Date().toISOString(),
+          action: editingId ? "updated" : "created",
+          message: editingId ? `${newCampaign.name} kampanyası güncellendi.` : "Kampanya oluşturuldu",
+        }
+      ]
     };
 
     try {
@@ -131,6 +144,8 @@ export default function CampaignsSettingsTab(): React.ReactElement {
       effectValue: campaign.effectValue,
       startDate: campaign.startDate || "",
       endDate: campaign.endDate || "",
+      lastChangeDate: campaign.lastChangeDate,
+      changeLog: campaign.changeLog || [],
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -141,6 +156,15 @@ export default function CampaignsSettingsTab(): React.ReactElement {
       await setDoc(doc(db, "campaigns", campaign.id), {
         ...campaign,
         isActive: !campaign.isActive,
+        lastChangeDate: new Date().toISOString(),
+        changeLog: [
+          ...(campaign.changeLog || []),
+          {
+            date: new Date().toISOString(),
+            action: campaign.isActive ? "deactivated" : "activated",
+            message: `Kampanya ${campaign.isActive ? 'devre dışı bırakıldı' : 'etkinleştirildi'}.`,
+          }
+        ]
       });
       toast.success(`${campaign.name} durumu güncellendi`);
     } catch (err) {
@@ -212,11 +236,23 @@ export default function CampaignsSettingsTab(): React.ReactElement {
             />
           </div>
           <div className="group">
-            <label className="block text-xs font-bold text-gray-500 mb-1.5 uppercase transition-colors group-focus-within:text-indigo-600">Bitiş Tarihi</label>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-xs font-bold text-gray-500 uppercase transition-colors group-focus-within:text-indigo-600">Bitiş Tarihi</label>
+              <label className="flex items-center gap-1.5 cursor-pointer group/toggle">
+                <input 
+                  type="checkbox" 
+                  checked={!newCampaign.endDate} 
+                  onChange={(e) => setNewCampaign({ ...newCampaign, endDate: e.target.checked ? "" : new Date().toISOString().split("T")[0] })}
+                  className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 transition-all cursor-pointer"
+                />
+                <span className={`text-[10px] font-bold uppercase transition-colors ${!newCampaign.endDate ? 'text-indigo-600' : 'text-gray-400'}`}>Süresiz</span>
+              </label>
+            </div>
             <input
               type="date"
-              className="border-2 border-gray-100 rounded-xl px-3 py-2.5 w-full text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/50 transition-all cursor-pointer"
-              value={newCampaign.endDate}
+              disabled={!newCampaign.endDate}
+              className={`border-2 border-gray-100 rounded-xl px-3 py-2.5 w-full text-sm outline-none transition-all ${!newCampaign.endDate ? 'bg-gray-50 text-gray-300 border-dashed opacity-50 cursor-not-allowed' : 'focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/50 cursor-pointer'}`}
+              value={newCampaign.endDate || ""}
               onChange={(e) => setNewCampaign({ ...newCampaign, endDate: e.target.value })}
             />
           </div>
@@ -397,9 +433,9 @@ export default function CampaignsSettingsTab(): React.ReactElement {
                         <div className="flex justify-center">
                           <button
                             onClick={() => handleToggleActive(c)}
-                            className={`w-12 h-6 rounded-full relative transition-all duration-300 cursor-pointer ${c.isActive ? "bg-green-500 shadow-sm shadow-green-200" : "bg-gray-200"}`}
+                            className={`w-11 h-6 rounded-full p-1 transition-all duration-300 cursor-pointer flex items-center ${c.isActive ? "bg-green-500 shadow-sm shadow-green-200" : "bg-gray-200"}`}
                           >
-                            <span className={`absolute w-4 h-4 bg-white rounded-full top-1 transition-all duration-300 shadow-md ${c.isActive ? "translate-x-7" : "translate-x-1"}`}></span>
+                            <div className={`w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm transform ${c.isActive ? "translate-x-5" : "translate-x-0"}`}></div>
                           </button>
                         </div>
                       </td>
@@ -407,6 +443,16 @@ export default function CampaignsSettingsTab(): React.ReactElement {
                         <div className="flex flex-col">
                           <span className={`font-bold text-sm ${!c.isActive ? "text-gray-400" : "text-gray-800"}`}>{c.name}</span>
                           {!c.isActive && <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">İşlem Dışı</span>}
+                          {c.lastChangeDate && (
+                            <span className="text-[9px] text-gray-400 mt-0.5">
+                              🕒 Son Değişiklik: {new Date(c.lastChangeDate).toLocaleString("tr-TR", { 
+                                day: '2-digit', 
+                                month: '2-digit', 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4">

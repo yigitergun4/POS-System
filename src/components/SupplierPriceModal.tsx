@@ -17,7 +17,6 @@ export default function SupplierPriceModal({
     const [targetField, setTargetField] = useState<TargetField>("price");
     const [method, setMethod] = useState<AdjustMethod>("percent_up");
     const [amount, setAmount] = useState<string>("");
-    const [showPreview, setShowPreview] = useState<boolean>(false);
     const [showConfirm, setShowConfirm] = useState<boolean>(false);
     const [isApplying, setIsApplying] = useState<boolean>(false);
 
@@ -28,7 +27,7 @@ export default function SupplierPriceModal({
     }, [products, selectedSupplier]);
 
     // Calculate new price
-    const calcNew = (old: number): number => {
+    const calcNew: (old: number) => number = (old: number): number => {
         const val: number = parseFloat(amount) || 0;
         if (method === "percent_up") return +(old * (1 + val / 100)).toFixed(2);
         if (method === "percent_down")
@@ -115,7 +114,6 @@ export default function SupplierPriceModal({
                             value={selectedSupplier}
                             onChange={(e) => {
                                 setSelectedSupplier(e.target.value);
-                                setShowPreview(false);
                                 setShowConfirm(false);
                             }}
                             className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-indigo-500 outline-none transition-all"
@@ -127,11 +125,6 @@ export default function SupplierPriceModal({
                                 </option>
                             ))}
                         </select>
-                        {selectedSupplier && (
-                            <div className="mt-2 px-3 py-1.5 bg-indigo-50 rounded-lg text-sm text-indigo-700 font-medium">
-                                {filtered.length} ürün etkilenecek
-                            </div>
-                        )}
                     </div>
 
                     {/* Target Field */}
@@ -196,21 +189,17 @@ export default function SupplierPriceModal({
                         </div>
                     </div>
 
-                    {/* Preview Toggle */}
-                    {isValid && (
-                        <button
-                            onClick={() => setShowPreview(!showPreview)}
-                            className="w-full py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
-                        >
-                            {showPreview ? "▼ Önizlemeyi Gizle" : "▶ Önizlemeyi Göster"} (
-                            {filtered.length} ürün)
-                        </button>
-                    )}
-
-                    {/* Preview Table */}
-                    {showPreview && isValid && (
-                        <div className="border border-gray-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
-                            <table className="min-w-full text-sm">
+                    {/* Product List / Preview */}
+                    {selectedSupplier && filtered.length > 0 && (
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
+                                <span className="text-xs font-bold text-gray-500 uppercase">Etkilenecek Ürünler ({filtered.length})</span>
+                                {amountNum > 0 && (
+                                    <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Önizleme Aktif</span>
+                                )}
+                            </div>
+                            <div className="border border-gray-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                                <table className="min-w-full text-sm">
                                 <thead className="bg-gray-50 sticky top-0">
                                     <tr>
                                         <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">
@@ -269,6 +258,7 @@ export default function SupplierPriceModal({
                                 </tbody>
                             </table>
                         </div>
+                    </div>
                     )}
                 </div>
 
@@ -329,7 +319,6 @@ export default function SupplierPriceModal({
                     <button
                         onClick={() => {
                             setShowConfirm(true);
-                            setShowPreview(true);
                         }}
                         disabled={!isValid || isApplying || showConfirm}
                         className={`flex-1 py-3 font-semibold rounded-xl active:scale-95 transition-all ${isValid && !isApplying && !showConfirm

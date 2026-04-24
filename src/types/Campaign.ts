@@ -10,4 +10,10 @@ export interface Campaign {
   conditionPaymentMethod: "ALL" | "cash" | "card";
   effectType: "add_fee_per_item" | "discount_per_item" | "percentage_discount";
   effectValue: number; // For percentage, it's like 10 for 10%
+  lastChangeDate?: string;
+  changeLog?: {
+    date: string;
+    action: string;
+    message: string;
+  }[];
 }

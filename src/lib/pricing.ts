@@ -53,7 +53,12 @@ export const applyCampaignsToCart = (
         if (finalItemPrice < 0) finalItemPrice = 0;
       }
     }
-    return { ...item, price: Math.round(finalItemPrice * 100) / 100 };
+    return { 
+      ...item, 
+      price: Math.round(finalItemPrice * 100) / 100,
+      originalPrice: item.price,
+      discountAmount: Math.round((item.price - finalItemPrice) * 100) / 100
+    };
   });
 
   const total = newItems.reduce((sum, item) => sum + item.price * item.qty, 0);

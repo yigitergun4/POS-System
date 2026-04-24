@@ -20,6 +20,7 @@ import CampaignsSettingsTab from "../components/CampaignsSettingsTab";
 import { toast } from "react-toastify";
 import { useConfirmation } from "../contexts/ConfirmationContext";
 import { DEFAULT_SUPPLIERS } from "../config";
+import { toTitleCase } from "../lib/format";
 
 type ActiveTab = "general" | "products" | "suppliers" | "campaigns";
 
@@ -117,6 +118,10 @@ export default function SettingsPage() {
       toast.error("Ürün adı ve barkod zorunludur!");
       return;
     }
+    if (!newProduct.cost || newProduct.cost <= 0) {
+      toast.error("Alış fiyatı zorunludur! (0'dan büyük olmalı)");
+      return;
+    }
     if (newProduct.price <= 0) {
       toast.error("Fiyat 0'dan büyük olmalı!");
       return;
@@ -135,8 +140,14 @@ export default function SettingsPage() {
       return;
     }
 
-    await setDoc(productRef, { ...newProduct, id });
-    toast.success(`${newProduct.name} başarıyla eklendi ✅`);
+    const capitalizedProduct = {
+      ...newProduct,
+      id,
+      name: toTitleCase(newProduct.name)
+    };
+
+    await setDoc(productRef, capitalizedProduct);
+    toast.success(`${capitalizedProduct.name} başarıyla eklendi ✅`);
     handleCloseModal();
   };
 
@@ -171,8 +182,12 @@ export default function SettingsPage() {
     field: keyof CartItem,
     value: string | number
   ) => {
-      await updateDoc(doc(db, "products", id), { [field]: value });
-    };
+    let finalValue = value;
+    if (field === "name" && typeof value === "string") {
+      finalValue = toTitleCase(value);
+    }
+    await updateDoc(doc(db, "products", id), { [field]: finalValue });
+  };
 
   const saveCurrency: () => Promise<void> = async () => {
     const generalRef = doc(db, "settings", "general");

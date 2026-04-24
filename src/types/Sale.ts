@@ -9,6 +9,8 @@ export type Sale = {
     name: string;
     category?: string;
     price: number;
+    originalPrice: number;
+    discountAmount: number;
     qty: number;
     cost?: number;
     barcode: string;

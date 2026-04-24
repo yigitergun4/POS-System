@@ -343,22 +343,30 @@ export default function DashboardPage() {
   const profitLoss = useMemo(() => {
     let totalRevenue: number = 0;
     let totalCost: number = 0;
+    let totalDiscount: number = 0;
 
     filteredSales.forEach((sale) => {
       if (sale.paymentMethod === "family") return;
       sale.items.forEach((item) => {
         if (selectedCategory !== "Tümü" && item.category !== selectedCategory) return;
+        
+        // Use the discounted price (price) for actual revenue
         const revenue: number = (item.price || 0) * item.qty;
         const cost: number = (item.cost || 0) * item.qty;
+        
+        // discountAmount is saved in newer sales, otherwise we can't accurately know for old sales
+        const discount: number = (item.discountAmount || 0) * item.qty;
+
         totalRevenue += revenue;
         totalCost += cost;
+        totalDiscount += discount;
       });
     });
 
     const grossProfit: number = totalRevenue - totalCost - totalCommission;
     const profitMargin: number = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 
-    return { totalRevenue, totalCost, grossProfit, profitMargin };
+    return { totalRevenue, totalCost, grossProfit, profitMargin, totalDiscount };
   }, [filteredSales, selectedCategory, totalCommission]);
 
   // Daily Profit Trend Data
@@ -626,16 +634,16 @@ export default function DashboardPage() {
           <span>📊 Kâr / Zarar Analizi</span>
         </button>
         {showProfitKPIs && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-emerald-100 text-sm font-medium">Toplam Ciro</span>
+                <span className="text-emerald-100 text-sm font-medium">Toplam Ciro (Net)</span>
                 <span className="text-2xl">💰</span>
               </div>
               <div className="text-2xl font-bold">
                 ₺{profitLoss.totalRevenue.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </div>
-              <div className="text-emerald-100 text-xs mt-1">Aile hariç satış geliri</div>
+              <div className="text-emerald-100 text-xs mt-1">Nakit + Kart - İndirimler</div>
             </div>
             <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
               <div className="flex items-center justify-between mb-2">
@@ -647,6 +655,16 @@ export default function DashboardPage() {
               </div>
               <div className="text-red-100 text-xs mt-1">Toplam alış maliyeti</div>
             </div>
+            <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-amber-100 text-sm font-medium">Yapılan İndirimler</span>
+                <span className="text-2xl">🎁</span>
+              </div>
+              <div className="text-2xl font-bold">
+                ₺{profitLoss.totalDiscount.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </div>
+              <div className="text-amber-100 text-xs mt-1">Kampanya & Manuel indirimler</div>
+            </div>
             <div className={`bg-gradient-to-br ${profitLoss.grossProfit >= 0 ? "from-green-500 to-green-600" : "from-rose-600 to-rose-700"} rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1`}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-white/80 text-sm font-medium">Brüt Kâr</span>
@@ -655,7 +673,7 @@ export default function DashboardPage() {
               <div className="text-2xl font-bold">
                 ₺{profitLoss.grossProfit.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </div>
-              <div className="text-white/80 text-xs mt-1">Ciro - Maliyet - Komisyon</div>
+              <div className="text-white/80 text-xs mt-1">Net Ciro - Maliyet - Komisyon</div>
             </div>
             <div className={`bg-gradient-to-br ${profitLoss.profitMargin >= 20 ? "from-teal-500 to-teal-600" : profitLoss.profitMargin >= 0 ? "from-amber-500 to-amber-600" : "from-rose-600 to-rose-700"} rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1`}>
               <div className="flex items-center justify-between mb-2">
@@ -720,7 +738,7 @@ export default function DashboardPage() {
                           labelFormatter={(ts) => format(new Date(ts), "dd/MM/yyyy")}
                           formatter={(value: number, name: string) => [
                             `₺${value.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}`,
-                            name === "revenue" ? "Ciro" : name === "cost" ? "Maliyet" : "Kâr",
+                            name === "revenue" ? "Net Ciro (İndirimli)" : name === "cost" ? "Maliyet" : "Kâr",
                           ]}
                         />
                         <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} dot={true} name="revenue" />
@@ -747,7 +765,7 @@ export default function DashboardPage() {
                       <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Kategori</th>
-                          <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Ciro</th>
+                          <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Net Ciro (İndirimli)</th>
                           <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Maliyet</th>
                           <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Kâr</th>
                           <th className="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Marj</th>
