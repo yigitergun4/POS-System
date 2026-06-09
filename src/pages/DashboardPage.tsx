@@ -42,7 +42,6 @@ export default function DashboardPage() {
   );
   const [showChat, setShowChat] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("Tümü");
-  const [showProfitKPIs, setShowProfitKPIs] = useState<boolean>(false);
 
   const options: {
     key: "daily" | "weekly" | "monthly" | "custom";
@@ -93,7 +92,7 @@ export default function DashboardPage() {
   }, [sales, range, startDate, endDate]);
 
   // Main KPIs - now filtered by selected category
-  const { totalSales, cashSales, cardSales, familySales, avgBasket, transactionCounts, totalCommission } =
+  const { cashSales, cardSales, familySales, avgBasket, transactionCounts, totalCommission } =
     useMemo(() => {
       let totalSales: number = 0;
       let cashSales: number = 0;
@@ -193,8 +192,6 @@ export default function DashboardPage() {
         totalCommission,
       };
     }, [filteredSales, selectedCategory]);
-  const totalSalesWithoutFamily: number = totalSales - familySales;
-
   // Extract unique categories from sales data
   const categories = useMemo(() => {
     const categorySet = new Set<string>(["Tümü"]);
@@ -205,48 +202,6 @@ export default function DashboardPage() {
     });
     return Array.from(categorySet);
   }, [filteredSales]);
-
-  // Category-filtered KPIs
-  const categoryKPIs = useMemo(() => {
-    let categorySales = 0;
-    let categoryUnits = 0;
-    let categoryTransactions = 0;
-
-    if (selectedCategory === "Tümü") {
-      filteredSales.forEach((sale) => {
-        if (sale.paymentMethod !== "family") {
-          categorySales += sale.total;
-          categoryTransactions++;
-          sale.items.forEach((item) => {
-            categoryUnits += item.qty;
-          });
-        }
-      });
-    } else {
-      const relevantSales = new Set<string>();
-      filteredSales.forEach((sale) => {
-        if (sale.paymentMethod !== "family") {
-          sale.items.forEach((item) => {
-            if (item.category === selectedCategory) {
-              categorySales += (item.price || 0) * item.qty;
-              categoryUnits += item.qty;
-              relevantSales.add(sale.id);
-            }
-          });
-        }
-      });
-      categoryTransactions = relevantSales.size;
-    }
-
-    const avgTransaction = categoryTransactions > 0 ? categorySales / categoryTransactions : 0;
-
-    return {
-      categorySales,
-      categoryUnits,
-      categoryTransactions,
-      avgTransaction,
-    };
-  }, [filteredSales, selectedCategory]);
 
   const categoryData: {
     labels: string[];
@@ -580,113 +535,93 @@ export default function DashboardPage() {
 
 
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
-          <SummaryCard
-            title={selectedCategory === "Tümü" ? "Toplam Satış" : `${selectedCategory} Satış`}
-            value={`₺${totalSalesWithoutFamily.toLocaleString("tr-TR")}`}
-            color="blue"
-            icon="💰"
-            subtitle={`${transactionCounts.nonFamily} işlem`}
-          />
-          <SummaryCard
-            title="Nakit Satış"
-            value={`₺${cashSales.toLocaleString("tr-TR")}`}
-            color="green"
-            icon="💵"
-            subtitle={`${transactionCounts.cash} işlem`}
-          />
-          <SummaryCard
-            title="Kart Satış"
-            value={`₺${cardSales.toLocaleString("tr-TR")}`}
-            color="purple"
-            icon="💳"
-            subtitle={`${transactionCounts.card} işlem / ₺${totalCommission.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} komisyon`}
-          />
-          <SummaryCard
-            title="Aile Satış"
-            value={`₺${familySales.toLocaleString("tr-TR")}`}
-            color="red"
-            icon="👨‍👩‍👧"
-            subtitle={`${transactionCounts.family} işlem`}
-          />
-          <SummaryCard
-            title="Ortalama Sepet"
-            value={`₺${Number(avgBasket).toLocaleString("tr-TR")}`}
-            color="orange"
-            icon="🛒"
-            subtitle="İşlem başına"
-          />
-          <SummaryCard
-            title="Kart Komisyonu"
-            value={`₺${totalCommission.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}`}
-            color="red"
-            icon="📉"
-            subtitle="%3.5 Banka kesintisi"
-          />
+        {/* Ana Finansal Performans */}
+        <div className="mb-6">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            📊 Ana Finansal Durum
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <SummaryCard
+              title={selectedCategory === "Tümü" ? "Toplam Net Ciro" : `${selectedCategory} Net Ciro`}
+              value={`₺${profitLoss.totalRevenue.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+              color="blue"
+              icon="💰"
+              subtitle="Ciro (İndirimler Hariç)"
+            />
+            <SummaryCard
+              title="Toplam Maliyet"
+              value={`₺${profitLoss.totalCost.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+              color="orange"
+              icon="📉"
+              subtitle="Satılan Ürün Alış Maliyeti"
+            />
+            <SummaryCard
+              title="Net Kâr"
+              value={`₺${profitLoss.grossProfit.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+              color={profitLoss.grossProfit >= 0 ? "green" : "red"}
+              icon={profitLoss.grossProfit >= 0 ? "📈" : "📉"}
+              subtitle="Ciro - Maliyet - Komisyon"
+            />
+            <SummaryCard
+              title="Kâr Marjı"
+              value={`%${profitLoss.profitMargin.toFixed(1)}`}
+              color={profitLoss.profitMargin >= 20 ? "green" : profitLoss.profitMargin >= 0 ? "orange" : "red"}
+              icon="📊"
+              subtitle={profitLoss.profitMargin >= 20 ? "İyi Kârlılık" : profitLoss.profitMargin >= 0 ? "Düşük Kârlılık" : "Zarar"}
+            />
+          </div>
         </div>
 
-        {/* Profit/Loss KPI Toggle */}
-        <button
-          onClick={() => setShowProfitKPIs((prev: boolean) => !prev)}
-          className="mb-4 flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition-all text-sm font-medium text-gray-700"
-        >
-          <span>{showProfitKPIs ? "▼" : "▶"}</span>
-          <span>📊 Kâr / Zarar Analizi</span>
-        </button>
-        {showProfitKPIs && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-emerald-100 text-sm font-medium">Toplam Ciro (Net)</span>
-                <span className="text-2xl">💰</span>
-              </div>
-              <div className="text-2xl font-bold">
-                ₺{profitLoss.totalRevenue.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-              </div>
-              <div className="text-emerald-100 text-xs mt-1">Nakit + Kart - İndirimler</div>
-            </div>
-            <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-red-100 text-sm font-medium">Toplam Maliyet</span>
-                <span className="text-2xl">📉</span>
-              </div>
-              <div className="text-2xl font-bold">
-                ₺{profitLoss.totalCost.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-              </div>
-              <div className="text-red-100 text-xs mt-1">Toplam alış maliyeti</div>
-            </div>
-            <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-amber-100 text-sm font-medium">Yapılan İndirimler</span>
-                <span className="text-2xl">🎁</span>
-              </div>
-              <div className="text-2xl font-bold">
-                ₺{profitLoss.totalDiscount.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-              </div>
-              <div className="text-amber-100 text-xs mt-1">Kampanya & Manuel indirimler</div>
-            </div>
-            <div className={`bg-gradient-to-br ${profitLoss.grossProfit >= 0 ? "from-green-500 to-green-600" : "from-rose-600 to-rose-700"} rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-white/80 text-sm font-medium">Brüt Kâr</span>
-                <span className="text-2xl">{profitLoss.grossProfit >= 0 ? "📈" : "📉"}</span>
-              </div>
-              <div className="text-2xl font-bold">
-                ₺{profitLoss.grossProfit.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-              </div>
-              <div className="text-white/80 text-xs mt-1">Net Ciro - Maliyet - Komisyon</div>
-            </div>
-            <div className={`bg-gradient-to-br ${profitLoss.profitMargin >= 20 ? "from-teal-500 to-teal-600" : profitLoss.profitMargin >= 0 ? "from-amber-500 to-amber-600" : "from-rose-600 to-rose-700"} rounded-xl p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-white/80 text-sm font-medium">Kâr Marjı</span>
-                <span className="text-2xl">📊</span>
-              </div>
-              <div className="text-2xl font-bold">
-                %{profitLoss.profitMargin.toFixed(1)}
-              </div>
-              <div className="text-white/80 text-xs mt-1">{profitLoss.profitMargin >= 20 ? "İyi" : profitLoss.profitMargin >= 0 ? "Düşük" : "Zarar"}</div>
-            </div>
+        {/* Detaylı Satış Analizi */}
+        <div className="mb-8">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            🔍 Detaylı Satış Analizi
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+            <SummaryCard
+              title="Nakit Satışlar"
+              value={`₺${cashSales.toLocaleString("tr-TR")}`}
+              color="green"
+              icon="💵"
+              subtitle={`${transactionCounts.cash} işlem`}
+            />
+            <SummaryCard
+              title="Kart Satışlar"
+              value={`₺${cardSales.toLocaleString("tr-TR")}`}
+              color="purple"
+              icon="💳"
+              subtitle={`${transactionCounts.card} işlem`}
+            />
+            <SummaryCard
+              title="Kart Komisyonu"
+              value={`₺${totalCommission.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}`}
+              color="red"
+              icon="🏦"
+              subtitle="Banka Kesintisi"
+            />
+            <SummaryCard
+              title="Ortalama Sepet"
+              value={`₺${Number(avgBasket).toLocaleString("tr-TR")}`}
+              color="blue"
+              icon="🛒"
+              subtitle="Fiş Ortalaması"
+            />
+            <SummaryCard
+              title="Yapılan İndirimler"
+              value={`₺${profitLoss.totalDiscount.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+              color="orange"
+              icon="🎁"
+              subtitle="Kampanyalar & İndirimler"
+            />
+            <SummaryCard
+              title="Aile Satışları"
+              value={`₺${familySales.toLocaleString("tr-TR")}`}
+              color="red"
+              icon="👨‍👩‍👧"
+              subtitle={`${transactionCounts.family} işlem`}
+            />
           </div>
-        )}
+        </div>
 
         {/* Tab Buttons */}
         <div className="flex gap-2 p-1 bg-gray-100 rounded-xl w-fit mb-6 w-full">
@@ -736,8 +671,8 @@ export default function DashboardPage() {
                         />
                         <RechartsTooltip
                           labelFormatter={(ts) => format(new Date(ts), "dd/MM/yyyy")}
-                          formatter={(value: number, name: string) => [
-                            `₺${value.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}`,
+                          formatter={(value: any, name: any) => [
+                            `₺${Number(value).toLocaleString("tr-TR", { minimumFractionDigits: 2 })}`,
                             name === "revenue" ? "Net Ciro (İndirimli)" : name === "cost" ? "Maliyet" : "Kâr",
                           ]}
                         />
@@ -807,99 +742,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {range !== "daily" ? (
-              <div className="col-span-1 lg:col-span-2">
-                <ChartCard title="Satış Trendleri" icon="📈" subtitle={selectedCategory === "Tümü" ? "Günlük satış grafiği" : `${selectedCategory} - Günlük`}>
-                  {filteredSales.length > 0 ? (
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                          data={(() => {
-                            const dailyTotals: { date: number; total: number }[] =
-                              Array.from(
-                                filteredSales.reduce((acc, sale: Sale) => {
-                                  if (sale.paymentMethod === "family") return acc;
 
-                                  const d: Date = new Date(
-                                    sale.timestamp.seconds * 1000
-                                  );
-                                  const dayStart: Date = new Date(
-                                    d.getFullYear(),
-                                    d.getMonth(),
-                                    d.getDate()
-                                  );
-                                  const key: number = dayStart.getTime();
-                                  const prev: number = acc.get(key) ?? 0;
-
-                                  // Calculate sale total based on category filter
-                                  let saleTotal: number = 0;
-                                  if (selectedCategory === "Tümü") {
-                                    saleTotal = sale.total;
-                                  } else {
-                                    sale.items.forEach((item) => {
-                                      if (item.category === selectedCategory) {
-                                        saleTotal += (item.price || 0) * item.qty;
-                                      }
-                                    });
-                                  }
-
-                                  if (saleTotal > 0) {
-                                    acc.set(key, prev + saleTotal);
-                                  }
-                                  return acc;
-                                }, new Map<number, number>())
-                              )
-                                .sort((a, b) => a[0] - b[0])
-                                .map(([ts, total]: [number, number]) => ({
-                                  date: ts,
-                                  total,
-                                }));
-
-                            return dailyTotals;
-                          })()}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis
-                            dataKey="date"
-                            type="number"
-                            scale="time"
-                            domain={["dataMin", "dataMax"]}
-                            tickFormatter={(ts) => format(new Date(ts), "dd/MM")}
-                            interval="preserveStartEnd"
-                            minTickGap={10}
-                          />
-                          <YAxis />
-                          <RechartsTooltip
-                            labelFormatter={(ts) =>
-                              format(new Date(ts), "dd/MM/yyyy")
-                            }
-                            formatter={(value: number) => [
-                              `₺${value.toFixed(2)}`,
-                              "Toplam Satış",
-                            ]}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="total"
-                            stroke="#3b82f6"
-                            strokeWidth={2}
-                            dot={true}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (
-                    <div className="h-64 flex items-center justify-center">
-                      <p className="text-gray-500 text-lg font-semibold">
-                        Seçilen aralıkta satış yok
-                      </p>
-                    </div>
-                  )}
-                </ChartCard>
-              </div>
-            ) : (
-              <></>
-            )}
 
             {/* Hourly Sales Chart */}
             <div className="col-span-1 lg:col-span-2">
@@ -932,8 +775,8 @@ export default function DashboardPage() {
                             borderRadius: "8px",
                             boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
                           }}
-                          formatter={(value: number) => [
-                            `₺${value.toLocaleString("tr-TR", {
+                          formatter={(value: any) => [
+                            `₺${Number(value).toLocaleString("tr-TR", {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
                             })}`,
@@ -970,81 +813,7 @@ export default function DashboardPage() {
                   </div>
                 )}
               </ChartCard>
-              {/* Category Stats Section */}
-              <div className="mt-8">
-                <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                      🏪 Kategori Bazlı Analiz
-                      <span className="text-sm font-normal text-gray-500">({selectedCategory})</span>
-                    </h2>
-                  </div>
 
-                  {/* Category KPI Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Total Category Sales */}
-                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-blue-100 text-sm font-medium">
-                          Kategori Satış
-                        </span>
-                        <span className="text-2xl">💰</span>
-                      </div>
-                      <div className="text-3xl font-bold">
-                        ₺{categoryKPIs.categorySales.toLocaleString("tr-TR", {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0,
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Units Sold */}
-                    <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-green-100 text-sm font-medium">
-                          Satılan Adet
-                        </span>
-                        <span className="text-2xl">📦</span>
-                      </div>
-                      <div className="text-3xl font-bold">
-                        {categoryKPIs.categoryUnits.toLocaleString("tr-TR")}
-                      </div>
-                      <div className="text-green-100 text-xs mt-1">Ürün adedi</div>
-                    </div>
-
-                    {/* Number of Transactions */}
-                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-purple-100 text-sm font-medium">
-                          İşlem Sayısı
-                        </span>
-                        <span className="text-2xl">🧾</span>
-                      </div>
-                      <div className="text-3xl font-bold">
-                        {categoryKPIs.categoryTransactions.toLocaleString("tr-TR")}
-                      </div>
-                      <div className="text-purple-100 text-xs mt-1">Toplam işlem</div>
-                    </div>
-
-                    {/* Average Transaction */}
-                    <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-5 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-orange-100 text-sm font-medium">
-                          Ortalama İşlem
-                        </span>
-                        <span className="text-2xl">📊</span>
-                      </div>
-                      <div className="text-3xl font-bold">
-                        ₺{categoryKPIs.avgTransaction.toLocaleString("tr-TR", {
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0,
-                        })}
-                      </div>
-                      <div className="text-orange-100 text-xs mt-1">İşlem başına</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
 
 

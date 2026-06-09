@@ -3,6 +3,7 @@ import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { toast } from "react-toastify";
 import type { SupplierPriceModalProps } from "../types/components";
+import { logPriceChange } from "../services/priceLogService";
 
 type TargetField = "price" | "cost" | "both";
 type AdjustMethod = "percent_up" | "percent_down" | "fixed_up" | "fixed_down";
@@ -65,13 +66,34 @@ export default function SupplierPriceModal({
         try {
             for (const p of filtered) {
                 const updates: Record<string, number> = {};
+                const oldPrice = p.price;
+                const oldCost = p.cost ?? 0;
+                let newPrice = oldPrice;
+                let newCost = oldCost;
+
                 if (targetField === "price" || targetField === "both") {
-                    updates.price = calcNew(p.price);
+                    newPrice = calcNew(p.price);
+                    updates.price = newPrice;
                 }
                 if (targetField === "cost" || targetField === "both") {
-                    updates.cost = calcNew(p.cost ?? 0);
+                    newCost = calcNew(p.cost ?? 0);
+                    updates.cost = newCost;
                 }
+
                 await updateDoc(doc(db, "products", p.barcode), updates);
+
+                if (newPrice !== oldPrice || newCost !== oldCost) {
+                    await logPriceChange({
+                        barcode: p.barcode,
+                        name: p.name,
+                        oldPrice,
+                        newPrice,
+                        oldCost,
+                        newCost,
+                        source: "supplier_adjustment",
+                        details: `Toplu toptancı zammı/indirimi (${selectedSupplier})`
+                    });
+                }
             }
             toast.success(`${filtered.length} ürün başarıyla güncellendi ✅`);
             onDone();

@@ -10,6 +10,10 @@ import {
   getDocs,
   onSnapshot,
   type DocumentReference,
+  query,
+  orderBy,
+  Query,
+  type DocumentData,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import type { CartItem } from "../types/Product";
@@ -21,8 +25,12 @@ import { toast } from "react-toastify";
 import { useConfirmation } from "../contexts/ConfirmationContext";
 import { DEFAULT_SUPPLIERS } from "../config";
 import { toTitleCase } from "../lib/format";
+import { logPriceChange } from "../services/priceLogService";
+import type { PriceLog } from "../types/services/index";
+import { format } from "date-fns";  
 
-type ActiveTab = "general" | "products" | "suppliers" | "campaigns";
+type ActiveTab = "general" | "products" | "suppliers" | "campaigns" | "logs";
+
 
 export default function SettingsPage() {
   const { confirm } = useConfirmation();
@@ -113,6 +121,49 @@ export default function SettingsPage() {
     fetchCurrency();
   }, []);
 
+  // Price logs management
+  const [priceLogs, setPriceLogs] = useState<PriceLog[]>([]);
+  const [logFilterText, setLogFilterText] = useState<string>("");
+  const [logPage, setLogPage] = useState<number>(1);
+  const logPageSize:number = 15;
+
+  // Load price logs when logs tab is active
+  useEffect(() => {
+    if (activeTab !== "logs") return;
+    const q: Query<DocumentData> = query(collection(db, "priceLogs"), orderBy("timestamp", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data: PriceLog[] = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as PriceLog[];
+      setPriceLogs(data);
+    });
+    return () => unsubscribe();
+  }, [activeTab]);
+
+  const filteredLogs: PriceLog[] = useMemo(() => {
+    return priceLogs.filter(log => 
+      (log.name || "").toLowerCase().includes(logFilterText.toLowerCase()) ||
+      (log.barcode || "").includes(logFilterText)
+    ) as PriceLog[];
+  }, [priceLogs, logFilterText]);
+
+  const paginatedLogs: PriceLog[] = useMemo(() => {
+    const start:number = (logPage - 1) * logPageSize;
+    return filteredLogs.slice(start, start + logPageSize) as PriceLog[];
+  }, [filteredLogs, logPage]);
+
+  // Reset page when search changes
+  useEffect(() => {
+    setLogPage(1);
+  }, [logFilterText]);
+
+  const formatLogDate = (timestamp: any) => {
+    if (!timestamp) return "-";
+    const date = timestamp.seconds ? new Date(timestamp.seconds * 1000) : new Date(timestamp);
+    return format(date, "dd/MM/yyyy HH:mm");
+  };
+
   const handleAddProduct: () => Promise<void> = async () => {
     if (!newProduct.name.trim() || !newProduct.barcode.trim()) {
       toast.error("Ürün adı ve barkod zorunludur!");
@@ -147,6 +198,16 @@ export default function SettingsPage() {
     };
 
     await setDoc(productRef, capitalizedProduct);
+    await logPriceChange({
+      barcode: capitalizedProduct.barcode,
+      name: capitalizedProduct.name,
+      oldPrice: 0,
+      newPrice: capitalizedProduct.price,
+      oldCost: 0,
+      newCost: capitalizedProduct.cost ?? 0,
+      source: "add_product",
+      details: "Yeni ürün eklendi"
+    });
     toast.success(`${capitalizedProduct.name} başarıyla eklendi ✅`);
     handleCloseModal();
   };
@@ -182,10 +243,42 @@ export default function SettingsPage() {
     field: keyof CartItem,
     value: string | number
   ) => {
-    let finalValue = value;
+    let finalValue: string | number = value;
     if (field === "name" && typeof value === "string") {
       finalValue = toTitleCase(value);
     }
+
+    const oldProduct: CartItem | undefined = productList.find((p) => p.id === id);
+    if (oldProduct && (field === "price" || field === "cost")) {
+      const numValue: number = Number(value);
+      const oldPrice: number = oldProduct.price;
+      const oldCost: number = oldProduct.cost || 0;
+      let newPrice: number = oldPrice;
+      let newCost: number = oldCost;
+      let hasChanged: boolean = false;
+
+      if (field === "price" && numValue !== oldPrice) {
+        newPrice = numValue;
+        hasChanged = true;
+      } else if (field === "cost" && numValue !== oldCost) {
+        newCost = numValue;
+        hasChanged = true;
+      }
+
+      if (hasChanged) {
+        await logPriceChange({
+          barcode: oldProduct.barcode,
+          name: oldProduct.name,
+          oldPrice: oldPrice,
+          newPrice: newPrice,
+          oldCost: oldCost,
+          newCost: newCost,
+          source: "update_product",
+          details: `Manuel düzenleme (${field === "price" ? "Satış Fiyatı" : "Alış Fiyatı"})`
+        });
+      }
+    }
+
     await updateDoc(doc(db, "products", id), { [field]: finalValue });
   };
 
@@ -259,6 +352,13 @@ export default function SettingsPage() {
             }`}
         >
           🎁 Kampanyalar
+        </button>
+        <button
+          onClick={() => setActiveTab("logs")}
+          className={`px-4 py-2 rounded-lg ${activeTab === "logs" ? "bg-blue-500 text-white" : "bg-gray-100"
+            }`}
+        >
+          📜 Fiyat Günlükleri
         </button>
       </div>
 
@@ -428,6 +528,152 @@ export default function SettingsPage() {
 
       {activeTab === "campaigns" && (
         <CampaignsSettingsTab />
+      )}
+
+      {activeTab === "logs" && (
+        <div className="p-6 bg-white shadow-md rounded-xl border border-gray-200 m-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                📜 Fiyat Değişim Günlükleri
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Ürünlerin alış ve satış fiyatlarındaki tüm değişimlerin geçmişi
+              </p>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <input
+                type="text"
+                placeholder="Ürün adı veya barkod ara..."
+                value={logFilterText}
+                onChange={(e) => setLogFilterText(e.target.value)}
+                className="border px-3 py-2 rounded-lg text-sm w-full sm:w-64 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              />
+              {logFilterText && (
+                <button
+                  onClick={() => setLogFilterText("")}
+                  className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition"
+                >
+                  Temizle
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50 font-semibold text-gray-600 uppercase text-[10px] tracking-wider">
+                  <tr>
+                    <th className="px-6 py-3.5 text-left">Tarih</th>
+                    <th className="px-6 py-3.5 text-left">Barkod</th>
+                    <th className="px-6 py-3.5 text-left">Ürün Adı</th>
+                    <th className="px-6 py-3.5 text-center">İşlem Tipi</th>
+                    <th className="px-6 py-3.5 text-right">Alış Fiyatı (Maliyet)</th>
+                    <th className="px-6 py-3.5 text-right">Satış Fiyatı</th>
+                    <th className="px-6 py-3.5 text-left">Detay</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {paginatedLogs.length > 0 ? (
+                    paginatedLogs.map((log) => {
+                      const costChanged = log.oldCost !== log.newCost;
+                      const priceChanged = log.oldPrice !== log.newPrice;
+                      
+                      const sourceBadgeColors: Record<string, string> = {
+                        add_product: "bg-green-50 text-green-700 border border-green-250",
+                        update_product: "bg-blue-50 text-blue-700 border border-blue-250",
+                        supplier_adjustment: "bg-purple-50 text-purple-700 border border-purple-250"
+                      };
+
+                      const sourceLabels: Record<string, string> = {
+                        add_product: "Yeni Ürün",
+                        update_product: "Manuel Düzenleme",
+                        supplier_adjustment: "Toptancı Zammı"
+                      };
+
+                      return (
+                        <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-medium">
+                            {formatLogDate(log.timestamp)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-mono text-xs">
+                            {log.barcode}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-gray-900 font-medium">
+                            {log.name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${sourceBadgeColors[log.source] || "bg-gray-100 text-gray-700"}`}>
+                              {sourceLabels[log.source] || log.source}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right font-medium">
+                            {costChanged ? (
+                              <span className="flex items-center justify-end gap-1.5">
+                                <span className="text-gray-400 line-through">₺{log.oldCost.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
+                                <span className="text-gray-800 font-bold">➔ ₺{log.newCost.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
+                              </span>
+                            ) : (
+                              <span className="text-gray-500">₺{log.newCost.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right font-medium">
+                            {priceChanged ? (
+                              <span className="flex items-center justify-end gap-1.5">
+                                <span className="text-gray-400 line-through">₺{log.oldPrice.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
+                                <span className="text-gray-800 font-bold">➔ ₺{log.newPrice.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
+                              </span>
+                            ) : (
+                              <span className="text-gray-500">₺{log.newPrice.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-gray-500 text-xs">
+                            {log.details || "-"}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="text-center py-12 text-gray-400">
+                        <span className="text-3xl block mb-2">📜</span>
+                        <p className="text-sm font-medium">Herhangi bir fiyat günlük kaydı bulunamadı</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Pagination */}
+          {filteredLogs.length > logPageSize && (
+            <div className="flex items-center justify-between mt-6 bg-gray-50 px-4 py-3 rounded-lg border border-gray-150">
+              <span className="text-xs text-gray-500">
+                Toplam <span className="font-semibold text-gray-700">{filteredLogs.length}</span> kayıttan {" "}
+                <span className="font-semibold text-gray-700">{Math.min(filteredLogs.length, (logPage - 1) * logPageSize + 1)}</span>-
+                <span className="font-semibold text-gray-700">{Math.min(filteredLogs.length, logPage * logPageSize)}</span> arası gösteriliyor
+              </span>
+              <div className="flex gap-2">
+                <button
+                  disabled={logPage === 1}
+                  onClick={() => setLogPage(p => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition"
+                >
+                  ◀ Geri
+                </button>
+                <button
+                  disabled={logPage * logPageSize >= filteredLogs.length}
+                  onClick={() => setLogPage(p => p + 1)}
+                  className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition"
+                >
+                  İleri ▶
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {showAddModal && (

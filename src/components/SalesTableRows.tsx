@@ -8,6 +8,7 @@ import { db } from "../lib/firebase";
 import { toast } from "react-toastify";
 import Pagination from "./Pagination";
 import { DEFAULT_PAGE_SIZE, type PageSizeOption } from "../config";
+import { exportSalesToCSV } from "../lib/csvExport";
 
 type PaymentMethodFilter = "all" | "cash" | "card" | "family" | "split";
 
@@ -199,6 +200,9 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
   const hasActiveFilters: boolean =
     searchText.trim() !== "" || paymentMethodFilter !== "all";
 
+  const salesToExport: Sale[] = filteredSales;
+  const hasSales: boolean = salesToExport && salesToExport.length > 0;
+
   // Get row background color based on payment method
   const getRowStyles: (paymentMethod: "cash" | "card" | "family" | "split", index: number) => string = (
     paymentMethod: "cash" | "card" | "family" | "split",
@@ -245,6 +249,18 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
               </span>{" "}
               satış
             </span>
+            <button
+              onClick={() => hasSales && exportSalesToCSV(salesToExport)}
+              disabled={!hasSales}
+              className={`text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow duration-200 ${
+                hasSales
+                  ? "bg-green-600 hover:bg-green-700 hover:shadow-md cursor-pointer"
+                  : "bg-gray-400 opacity-50 cursor-not-allowed"
+              }`}
+              title={hasSales ? "Power BI ve Excel için tüm satış verilerini CSV formatında indir" : "İndirilecek satış verisi bulunmamaktadır"}
+            >
+              📊 Power BI Aktar
+            </button>
             {/* Summary badges */}
             <div className="flex gap-2">
               {(["cash", "card", "family"] as const).map((method) => {
@@ -354,6 +370,9 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
                   )}
                 </button>
               </th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                📈 Kâr
+              </th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                 <button
                   onClick={() => handleSort("qty")}
@@ -381,6 +400,8 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
             {paginatedSales.length > 0 ? (
               paginatedSales.map((sale, index) => {
                 const paymentConfig = PAYMENT_METHOD_CONFIG[sale.paymentMethod];
+                const totalCost: number = sale.items.reduce((sum: number, item) => sum + (item.cost || 0) * item.qty, 0);
+                const profit: number = sale.total - totalCost - (sale.cardCommission || 0);
                 return (
                   <tr
                     key={sale.id}
@@ -410,7 +431,7 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
                       </span>
                       {sale.paymentMethod === "split" && sale.splitDetails && (
                         <div className="flex flex-wrap gap-1 mt-1.5">
-                          <span className="inline-flex items-center gap-0.5 text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-md whitespace-nowrap">
+                           <span className="inline-flex items-center gap-0.5 text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-md whitespace-nowrap">
                             💵 ₺{sale.splitDetails.cashAmount.toLocaleString("tr-TR")}
                           </span>
                           <span className="inline-flex items-center gap-0.5 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md whitespace-nowrap">
@@ -422,6 +443,11 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
                     <td className="px-4 py-3 text-right">
                       <span className="text-lg font-bold text-gray-900">
                         ₺{sale.total.toLocaleString("tr-TR")}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium">
+                      <span className={`text-md font-bold ${profit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        ₺{profit.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -470,7 +496,7 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
             ) : (
               <tr>
                 <td
-                  colSpan={user?.role === "admin" ? 6 : 5}
+                  colSpan={user?.role === "admin" ? 7 : 6}
                   className="text-center py-12"
                 >
                   <div className="flex flex-col items-center gap-2">
