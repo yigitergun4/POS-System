@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Navbar from "../components/Navbar";
 import SummaryCard from "../components/SummaryCardDashboardPage";
 import ChartCard from "../components/ChartCardDashboardPage";
@@ -23,6 +23,8 @@ import { Pie } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import type { Sale } from "../types/Sale";
 import SalesTable from "../components/SalesTableRows";
+import { PREDEFINED_REPORTS, getDashboardRangeSuffix } from "../lib/dateRanges";
+import { exportPredefinedReport } from "../lib/csvExport";
 
 // Register Chart.js elements
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -40,8 +42,22 @@ export default function DashboardPage() {
   const [activeReportTab, setActiveReportTab] = useState<"charts" | "list">(
     "charts"
   );
-  const [showChat, setShowChat] = useState(false);
+  const [showChat, setShowChat] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("Tümü");
+  const [showReadyReports, setShowReadyReports] = useState<boolean>(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside: (event: MouseEvent) => void = (event: MouseEvent): void => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowReadyReports(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const options: {
     key: "daily" | "weekly" | "monthly" | "custom";
@@ -67,7 +83,7 @@ export default function DashboardPage() {
   const filteredSales: Sale[] = useMemo(() => {
     let from: Date;
     let to: Date;
-    const today = new Date();
+    const today: Date = new Date();
 
     if (range === "daily") {
       from = startOfDay(today);
@@ -99,10 +115,10 @@ export default function DashboardPage() {
       let cardSales: number = 0;
       let familySales: number = 0;
       let totalCommission: number = 0;
-      const cashTransactions = new Set<string>();
-      const cardTransactions = new Set<string>();
-      const familyTransactions = new Set<string>();
-      const allTransactions = new Set<string>();
+      const cashTransactions: Set<string> = new Set<string>();
+      const cardTransactions: Set<string> = new Set<string>();
+      const familyTransactions: Set<string> = new Set<string>();
+      const allTransactions: Set<string> = new Set<string>();
 
       filteredSales.forEach((s: Sale) => {
         if (selectedCategory === "Tümü") {
@@ -268,7 +284,7 @@ export default function DashboardPage() {
   }, [filteredSales, selectedCategory]);
 
   // Top selling products
-  const topProducts = useMemo(() => {
+  const topProducts: { name: string; qty: number; revenue: number }[] = useMemo(() => {
     const productStats: Record<string, { qty: number; revenue: number }> = {};
 
     filteredSales.forEach((sale) => {
@@ -441,10 +457,68 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowChat(true)}
-              className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
+              className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2 text-sm font-medium cursor-pointer"
             >
               🤖 Maje
             </button>
+
+            {/* Hazır Raporlar Açılır Menüsü */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setShowReadyReports(!showReadyReports)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-1.5 text-sm font-medium shadow-md hover:shadow-lg cursor-pointer"
+              >
+                📊 Hazır Raporlar ▾
+              </button>
+              {showReadyReports && (
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 p-2">
+                  <div className="text-[11px] font-bold text-gray-400 px-3 py-2 uppercase tracking-wider border-b border-gray-100">
+                    Power BI / Excel Aktar
+                  </div>
+
+                  <div className="mt-1.5 space-y-0.5 max-h-[350px] overflow-y-auto">
+                    {PREDEFINED_REPORTS.map((report) => {
+                      const today = new Date();
+                      const { from, to } = report.getDateRange(today);
+                      const count = sales.filter((s) => {
+                        const d = new Date(s.timestamp.seconds * 1000);
+                        return d >= from && d <= to;
+                      }).length;
+
+                      return (
+                        <button
+                          key={report.key}
+                          onClick={() => {
+                            exportPredefinedReport(sales, report);
+                            setShowReadyReports(false);
+                          }}
+                          disabled={count === 0}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all ${
+                            count > 0
+                              ? "hover:bg-blue-50 text-gray-700 hover:text-blue-700 cursor-pointer"
+                              : "text-gray-300 bg-gray-50/50 opacity-50 cursor-not-allowed"
+                          }`}
+                          title={report.description}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-xl">{report.icon}</span>
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold">{report.label}</span>
+                              <span className="text-[10px] text-gray-400 font-normal">{report.description}</span>
+                            </div>
+                          </div>
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                            count > 0 ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-400"
+                          }`}>
+                            {count} Satış
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
             {/* Category Filter - Only visible in charts tab */}
             {activeReportTab === "charts" && (
               <Listbox value={selectedCategory} onChange={setSelectedCategory}>
@@ -622,6 +696,8 @@ export default function DashboardPage() {
             />
           </div>
         </div>
+
+
 
         {/* Tab Buttons */}
         <div className="flex gap-2 p-1 bg-gray-100 rounded-xl w-fit mb-6 w-full">
@@ -977,7 +1053,10 @@ export default function DashboardPage() {
           </div>
         )}
         {activeReportTab === "list" && (
-          <SalesTable filteredSales={filteredSales} />
+          <SalesTable 
+            filteredSales={filteredSales} 
+            dateRangeSuffix={getDashboardRangeSuffix(range, startDate, endDate)} 
+          />
         )}
       </div>
       {showChat && <ChatInterface onClose={() => setShowChat(false)} />}

@@ -50,7 +50,13 @@ const PAYMENT_FILTER_LABELS: Record<PaymentMethodFilter, string> = {
   split: "✂️ Bölüşümlü",
 };
 
-function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
+function SalesTable({ 
+  filteredSales, 
+  dateRangeSuffix
+}: { 
+  filteredSales: Sale[]; 
+  dateRangeSuffix?: string; 
+}) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<"date" | "total" | "qty" | null>(
     "date"
@@ -250,7 +256,7 @@ function SalesTable({ filteredSales }: { filteredSales: Sale[] }) {
               satış
             </span>
             <button
-              onClick={() => hasSales && exportSalesToCSV(salesToExport)}
+              onClick={() => hasSales && exportSalesToCSV(salesToExport, dateRangeSuffix)}
               disabled={!hasSales}
               className={`text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow duration-200 ${
                 hasSales
